@@ -1,0 +1,54 @@
+{
+  "schema_version": "0.1",
+  "access_date": "2026-04-28",
+  "sources": [
+    {
+      "source_id": "barrick_ltee_ecoli",
+      "source_name": "Barrick lab LTEE-Ecoli genomics resources",
+      "source_url": "https://github.com/barricklab/LTEE-Ecoli",
+      "source_type": "public_genomics_repository",
+      "citation": "Barrick Lab. LTEE-Ecoli: Genomics resources for the Long-Term Evolution Experiment with E. coli.",
+      "license_or_terms": "CC0-1.0 license listed by repository.",
+      "download_method": "not downloaded; registry entry only",
+      "raw_filename": "",
+      "processing_script": "",
+      "notes": "Public genomics resource for LTEE mutation data. No raw files are imported by this scaffold."
+    },
+    {
+      "source_id": "sprouffske_2018",
+      "source_name": "Sprouffske et al. 2018",
+      "source_url": "https://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1007324",
+      "source_type": "paper_with_data_repository",
+      "citation": "Sprouffske K, Aguilar-Rodriguez J, Sniegowski P, Wagner A. 2018. High mutation rates limit evolutionary adaptation in Escherichia coli. PLOS Genetics 14(4): e1007324.",
+      "license_or_terms": "Creative Commons Attribution License listed by PLOS article.",
+      "download_method": "not downloaded; registry entry only",
+      "raw_filename": "",
+      "processing_script": "",
+      "notes": "Relevant for engineered E. coli mutation-rate treatments, selected-environment growth, robustness assays, and sequencing results."
+    },
+    {
+      "source_id": "couce_2017",
+      "source_name": "Couce et al. 2017",
+      "source_url": "https://www.pnas.org/doi/10.1073/pnas.1705887114",
+      "source_type": "paper_with_supplementary_data",
+      "citation": "Couce A, Viraphong Caudwell L, Feinauer C, Hindre T, Feugeas JP, Weigt M, Lenski RE, Schneider D, Tenaillon O. 2017. Mutator genomes decay, despite sustained fitness gains, in a long-term experiment with bacteria. PNAS 114:E9026-E9035.",
+      "license_or_terms": "See publisher page for article and supplementary-material terms.",
+      "download_method": "not downloaded; registry entry only",
+      "raw_filename": "",
+      "processing_script": "",
+      "notes": "Relevant for separating selected-environment fitness gains from genome-decay signatures in LTEE mutator populations."
+    },
+    {
+      "source_id": "maddamsetti_2020",
+      "source_name": "Maddamsetti and Grant 2020",
+      "source_url": "https://academic.oup.com/gbe/article/12/9/1591/5898197",
+      "source_type": "paper_with_ltee_metagenomics_analysis",
+      "citation": "Maddamsetti R, Grant NA. 2020. Divergent Evolution of Mutation Rates and Biases in the Long-Term Evolution Experiment with Escherichia coli. Genome Biology and Evolution 12(9):1591-1603.",
+      "license_or_terms": "Open Access article; see Oxford Academic page for license terms.",
+      "download_method": "not downloaded; registry entry only",
+      "raw_filename": "",
+      "processing_script": "",
+      "notes": "Relevant for LTEE mutation-rate and mutation-bias evolution across replicate populations."
+    }
+  ]
+}

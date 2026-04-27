@@ -4,16 +4,20 @@ This directory is for empirical data used by the Mutation Rate Range Model.
 
 ## Current status
 
-No curated project data is included yet.
+The repository includes a small source registry and an example processed
+observation file for schema validation.
 
-The first implementation should work without data files.
+These files are not calibrated model inputs. The deterministic model should
+continue to work without treating empirical observations as fitted parameters.
 
 ## Directory structure
 
 ```text
 data/
+  source_registry.json
   raw/
   processed/
+    example_observations.csv
   external/
   README.md
 ```
@@ -29,6 +33,10 @@ Do not manually edit these files.
 Generated cleaned data files.
 
 Every file in this directory should be reproducible from scripts or notebooks.
+
+The current `example_observations.csv` file is schema/example data only. It
+preserves source context and validates field conventions, but it should not be
+used to make model conclusions.
 
 ## `external/`
 

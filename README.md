@@ -1,24 +1,41 @@
 # Mutation Rate Range Model
 
-A local, reproducible modelling tool for exploring the mutation-rate range in which an *E. coli*-like asexual population can improve fitness over long periods while avoiding excessive genome decay.
+A local, reproducible modelling tool for exploring the mutation-rate range in which an *E. coli*-like asexual population can improve fitness over long periods while avoiding excessive mutation accumulation, genome decay, or robustness loss.
 
 The project is inspired by the Long-Term Evolution Experiment (LTEE), mutator genome-decay studies, and theoretical models of mutation-rate evolution.
 
 ## Current status
 
-This repository is at the specification stage.
+This repository now contains:
 
-It currently contains project documentation and modelling requirements. The Python implementation, curated datasets, fitted parameters, and validation reports are not yet complete.
+- a first deterministic curve-based model
+- a local Streamlit GUI for inspecting model behaviour
+- parameter validation and tests
+- plotting helpers
+- a scaffold for curated experimental data
+- an experimental-data inventory section in the app
 
-The first initial deterministic implementation exists.
+The project is **not calibrated yet**. The included experimental-data files are currently a schema/pipeline foundation, not final fitted biological data.
 
-To run the first implementation use:
+## Run locally
 
-```text
+From the repository root:
+
+```bash
+python -m venv .venv
 source .venv/bin/activate
+pip install -r requirements.txt
+pytest
 streamlit run app/streamlit_app.py
 ```
-It should open the model on http://localhost:8501/
+
+The Streamlit app should open at:
+
+```text
+http://localhost:8501/
+```
+
+If Streamlit asks for an email address on first launch, it can be left blank.
 
 ## Goal
 
@@ -31,7 +48,7 @@ Instead, this project estimates empirical curves:
 - mutation rate -> retained robustness in alternative environments
 - mutation rate -> net long-term score
 
-The model should identify an approximate range:
+The model should eventually identify an approximate range:
 
 - `mu_min`: mutation-rate multiplier below which adaptation is too slow
 - `mu_peak`: mutation-rate multiplier with the highest net score
@@ -47,6 +64,7 @@ Several experimental and theoretical results motivate this project:
 - Sprouffske et al. 2018 showed that high mutation rates can limit adaptive evolution in *E. coli*.
 - Good & Desai 2016 developed theory for mutation-rate evolution in rapidly adapting asexual populations.
 - LTEE datasets provide long-term empirical data for mutation accumulation, fitness change, and evolutionary dynamics.
+- Maddamsetti et al. 2020 studied mutation-rate and mutation-bias evolution in LTEE populations.
 
 The project treats selected-environment fitness and genome integrity as related but separate outputs.
 
@@ -58,6 +76,7 @@ This project is:
 - a local GUI for exploring assumptions
 - a curve-based approximation with uncertainty bands
 - a reproducible Python codebase
+- a place to curate experimental observations
 - a way to test sensitivity of conclusions to uncertain parameters
 
 ## What this project is not
@@ -67,6 +86,7 @@ This project is not:
 - a full whole-cell simulation
 - a proof of a universal optimal mutation rate
 - a model that knows the exact cost of every mutation
+- a calibrated biological predictor yet
 - a claim that "good" and "bad" mutations are absolute categories
 - a replacement for experimental biology
 
@@ -92,30 +112,51 @@ S(m, T) = B(m, T) - lambda_decay * D(m, T) + rho_robustness * R(m, T)
 
 Important: `D(m, T)` is a scalar proxy. It is not a direct measurement of every harmful mutation. It combines mutation accumulation, deleterious load, and inferred loss of genome integrity into one deliberately simplified term.
 
+The first model is intended to test whether assumptions produce biologically plausible curve shapes, not to estimate a true biological optimum.
+
 Later versions may add stochastic Wright-Fisher simulation, Approximate Bayesian Computation, Bayesian hierarchical fitting, and state-space models.
 
-## Planned local GUI
+## Experimental data scaffold
 
-The GUI should allow the user to:
+The repository now includes an experimental-data foundation.
+
+Its purpose is to make it possible to add, validate, inspect, and document curated observations from experimental evolution studies.
+
+Current intended source areas include:
+
+- Barrick lab LTEE-Ecoli genomics resources
+- Sprouffske et al. 2018
+- Couce et al. 2017
+- Maddamsetti et al. 2020
+
+The current data scaffold is **not calibrated model input yet**.
+
+Processed observations should preserve source context, including:
+
+- source or paper
+- experiment
+- strain or population
+- generation
+- mutation-rate multiplier if known
+- relative fitness if known
+- mutation count or genome-decay proxy if known
+- robustness or environment information if known
+- uncertainty and method notes
+
+Raw data should remain immutable. Processed data should document transformations and avoid inventing missing values.
+
+## Streamlit app
+
+The local GUI allows the user to:
 
 - change mutation-rate range
 - change generation horizon
-- change benefit and decay parameters
+- change benefit, decay, and robustness parameters
 - observe benefit, decay, robustness, and net-score curves
-- view uncertainty bands
-- inspect sensitivity analysis
-- spot unrealistic model behaviour visually
+- inspect whether curve behaviour looks biologically plausible
+- view the experimental-data inventory scaffold
 
-Preferred stack:
-
-- Python 3.11+
-- NumPy
-- SciPy
-- pandas
-- Plotly
-- Streamlit
-- Pydantic
-- pytest
+The experimental-data section should be read as schema/data-pipeline inspection only until curated numeric datasets are added.
 
 ## Repository structure
 
@@ -129,8 +170,7 @@ mutation-rate-range-model/
   data/
     raw/
     processed/
-    external/
-    README.md
+    sources.yaml
 
   docs/
     scientific_background.md
@@ -151,6 +191,7 @@ mutation-rate-range-model/
       fitting.py
       sensitivity.py
       validation.py
+      datasets.py
       data_loaders.py
       plotting.py
 
@@ -162,15 +203,15 @@ mutation-rate-range-model/
     test_parameters.py
     test_sensitivity.py
     test_validation.py
-
-  notebooks/
-    01_explore_sources.ipynb
-    02_fit_initial_curves.ipynb
-    03_validate_against_ltee.ipynb
+    test_datasets.py
+    test_data_loaders.py
 
   reports/
     first_model_report.md
+    data_inventory.md
 ```
+
+Some listed files may be placeholders or scaffolds for later stages.
 
 ## Scientific rule
 
@@ -188,36 +229,11 @@ A valid result is:
 Under these assumptions and uncertainty ranges, the model estimates a likely net-beneficial mutation-rate range between A and B times wild type, with the peak near C to D times wild type. The result is most sensitive to genome-decay penalty and DFE assumptions.
 ```
 
-The first model is intended to test whether assumptions produce biologically plausible curve shapes, not to estimate a true biological optimum.
-
-## First Codex task
-
-Build the initial Python project skeleton from `docs/model_spec.md`.
-
-Implement only:
-
-- deterministic curve functions
-- parameter validation
-- tests
-- simple plotting helpers
-- a basic Streamlit GUI for local inspection
-
-Do not implement yet:
-
-- stochastic simulation
-- Bayesian fitting
-- real-data fitting
-- automated conclusions
-- publication-style claims
+Experimental observations should be used to constrain, compare, or falsify assumptions — not to create false precision.
 
 ## Development commands
 
-Expected commands after the first implementation:
-
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
 pytest
 streamlit run app/streamlit_app.py
 ```
@@ -232,3 +248,16 @@ Start with:
 - [`docs/references.md`](docs/references.md)
 - [`docs/data_plan.md`](docs/data_plan.md)
 - [`docs/validation_plan.md`](docs/validation_plan.md)
+- [`reports/first_model_report.md`](reports/first_model_report.md)
+- [`reports/data_inventory.md`](reports/data_inventory.md)
+
+## Next steps
+
+Likely next development steps:
+
+1. curate real numeric observations from the registered sources
+2. separate placeholder/schema rows from real processed observations
+3. compare deterministic curves against curated data points
+4. add validation plots
+5. document which assumptions are supported, weakly supported, or contradicted
+6. only then consider calibration or stochastic simulation

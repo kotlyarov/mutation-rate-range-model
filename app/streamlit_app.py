@@ -13,6 +13,12 @@ if str(SRC) not in sys.path:
 import streamlit as st
 
 from mrrm import ModelParameters, evaluate_model
+from mrrm.data_loaders import (
+    DataValidationError,
+    build_data_inventory,
+    load_processed_observations,
+    load_source_registry,
+)
 from mrrm.plotting import make_curve_figure
 from mrrm.validation import ParameterValidationError
 
@@ -57,6 +63,8 @@ def main() -> None:
         st.caption(
             "D is a scalar decay proxy, not a direct measurement of every harmful mutation."
         )
+
+    _render_data_inventory()
 
 
 def _sidebar_parameters() -> ModelParameters:
@@ -186,6 +194,33 @@ def _format_optional(value: float | None) -> str:
     if value is None:
         return "not identified"
     return f"{value:.3g}x"
+
+
+def _render_data_inventory() -> None:
+    st.subheader("Experimental-data inventory")
+    st.info("Example/schema data only — not calibrated model input yet.")
+
+    try:
+        inventory = build_data_inventory()
+        sources = load_source_registry()
+        observations = load_processed_observations()
+    except DataValidationError as exc:
+        st.error(f"Experimental-data validation error: {exc}")
+        return
+
+    cols = st.columns(3)
+    cols[0].metric("registered sources", inventory["source_count"])
+    cols[1].metric("processed observations", inventory["observation_count"])
+    cols[2].metric(
+        "rows with mutation-rate values",
+        inventory["numeric_field_counts"]["mutation_rate_multiplier"],
+    )
+
+    with st.expander("Registered sources", expanded=False):
+        st.dataframe(sources, use_container_width=True)
+
+    with st.expander("Example processed observations", expanded=False):
+        st.dataframe(observations, use_container_width=True)
 
 
 if __name__ == "__main__":
