@@ -21,10 +21,10 @@
       "source_type": "paper_with_data_repository",
       "citation": "Sprouffske K, Aguilar-Rodriguez J, Sniegowski P, Wagner A. 2018. High mutation rates limit evolutionary adaptation in Escherichia coli. PLOS Genetics 14(4): e1007324.",
       "license_or_terms": "Creative Commons Attribution License listed by PLOS article.",
-      "download_method": "not downloaded; registry entry only",
-      "raw_filename": "",
-      "processing_script": "",
-      "notes": "Relevant for engineered E. coli mutation-rate treatments, selected-environment growth, robustness assays, and sequencing results."
+      "download_method": "PLOS supplementary S3 Table downloaded manually from article file endpoint; Dryad phenotyping archive not imported.",
+      "raw_filename": "data/raw/sprouffske_2018/s3_genomic_mutation_rates.xlsx",
+      "processing_script": "manual curation into data/processed/calibration_dataset_v0.csv",
+      "notes": "Relevant for engineered E. coli mutation-rate treatments, selected-environment growth, robustness assays, and sequencing results. calibration_dataset_v0 currently includes only S3 genomic mutation-rate values and confidence intervals, not fitness values."
     },
     {
       "source_id": "couce_2017",

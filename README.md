@@ -133,6 +133,10 @@ Current intended source areas include:
 
 The current data scaffold is **not calibrated model input yet**.
 
+calibration_dataset_v0 currently contains real Sprouffske et al. 2018 mutation-rate values and confidence intervals only. It does not yet contain fitness-vs-control values, mutation-count/genome-decay costs, or fitted benefit/decay curves. Therefore it anchors the mutation-rate axis, but does not yet answer the main biological question.
+
+Next required dataset work: extract exact fitness-vs-control values from Sprouffske et al. 2018 or its Dryad files if available. If exact numeric values are unavailable, record the value as missing and document whether figure digitisation would be required.
+
 Processed observations should preserve source context, including:
 
 - source or paper
@@ -257,7 +261,7 @@ Start with:
 
 Likely next development steps:
 
-1. curate real numeric observations from the registered sources
+1. extract exact fitness-vs-control values from Sprouffske et al. 2018 or its Dryad files if available
 2. separate placeholder/schema rows from real processed observations
 3. compare deterministic curves against curated data points
 4. replace deprecated Streamlit `use_container_width` calls with `width`

@@ -15,11 +15,13 @@ import streamlit as st
 from mrrm import ModelParameters, evaluate_model
 from mrrm.data_loaders import (
     DataValidationError,
+    build_calibration_inventory,
     build_data_inventory,
+    load_calibration_dataset,
     load_processed_observations,
     load_source_registry,
 )
-from mrrm.plotting import make_curve_figure
+from mrrm.plotting import make_curve_figure, make_raw_observation_figure
 from mrrm.validation import ParameterValidationError
 
 
@@ -30,6 +32,7 @@ def main() -> None:
         "Exploratory deterministic curves only. Outputs are conditional on the "
         "selected assumptions and are not validated biological estimates."
     )
+    _render_calibration_dataset()
 
     params = _sidebar_parameters()
     try:
@@ -220,6 +223,40 @@ def _render_data_inventory() -> None:
         st.dataframe(sources, use_container_width=True)
 
     with st.expander("Example processed observations", expanded=False):
+        st.dataframe(observations, use_container_width=True)
+
+
+def _render_calibration_dataset() -> None:
+    st.subheader("Raw experimental observations")
+    st.info(
+        "calibration_dataset_v0 currently contains real Sprouffske et al. 2018 "
+        "mutation-rate values and confidence intervals only. It does not yet "
+        "contain fitness-vs-control values, mutation-count/genome-decay costs, "
+        "or fitted benefit/decay curves. Therefore it anchors the mutation-rate "
+        "axis, but does not yet answer the main biological question."
+    )
+    st.caption(
+        "Next required dataset work: extract exact fitness-vs-control values "
+        "from Sprouffske et al. 2018 or its Dryad files if available. If exact "
+        "numeric values are unavailable, record the value as missing and "
+        "document whether figure digitisation would be required."
+    )
+
+    try:
+        observations = load_calibration_dataset()
+        inventory = build_calibration_inventory()
+    except DataValidationError as exc:
+        st.error(f"Calibration-data validation error: {exc}")
+        return
+
+    cols = st.columns(3)
+    cols[0].metric("raw observations", inventory["observation_count"])
+    cols[1].metric("fitness values", inventory["fitness_observation_count"])
+    cols[2].metric("sources", len(inventory["sources"]))
+
+    st.plotly_chart(make_raw_observation_figure(observations), use_container_width=True)
+
+    with st.expander("calibration_dataset_v0 rows", expanded=False):
         st.dataframe(observations, use_container_width=True)
 
 

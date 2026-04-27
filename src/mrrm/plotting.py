@@ -1,10 +1,70 @@
-"""Plotting helpers for deterministic model results."""
+"""Plotting helpers for deterministic model results and raw observations."""
 
 from __future__ import annotations
 
 import plotly.graph_objects as go
 
 from .curves import ModelResults
+
+
+def make_raw_observation_figure(observations: list[dict]) -> go.Figure:
+    """Create a raw-observation plot from calibration_dataset_v0 rows."""
+
+    fig = go.Figure()
+    strains = sorted({row["strain_or_population"] for row in observations})
+    for strain in strains:
+        rows = [
+            row
+            for row in observations
+            if row["strain_or_population"] == strain
+            and row["measurement_kind"] == "genomic_mutation_rate_U"
+        ]
+        if not rows:
+            continue
+        x_values = [row["mutation_rate_multiplier"] for row in rows]
+        y_values = [row["measurement_value"] for row in rows]
+        lower_errors = [
+            row["measurement_value"] - row["measurement_lower"]
+            for row in rows
+        ]
+        upper_errors = [
+            row["measurement_upper"] - row["measurement_value"]
+            for row in rows
+        ]
+        labels = [
+            f"{row['strain_or_population']} {row['replicate']} generation {row['generation']}"
+            for row in rows
+        ]
+        fig.add_scatter(
+            x=x_values,
+            y=y_values,
+            error_y={
+                "type": "data",
+                "array": upper_errors,
+                "arrayminus": lower_errors,
+                "visible": True,
+            },
+            mode="markers",
+            name=strain,
+            text=labels,
+            hovertemplate=(
+                "%{text}<br>"
+                "mutation-rate multiplier=%{x:.3g}<br>"
+                "U=%{y:.3g}<extra></extra>"
+            ),
+        )
+
+    fig.update_layout(
+        title="Raw Sprouffske et al. 2018 mutation-rate observations",
+        xaxis_title="Derived mutation-rate multiplier relative to MRS ancestor U",
+        yaxis_title="Genomic mutation rate U",
+        xaxis_type="log",
+        yaxis_type="log",
+        legend_title="Strain",
+        template="plotly_white",
+        margin={"l": 48, "r": 24, "t": 56, "b": 48},
+    )
+    return fig
 
 
 def make_curve_figure(results: ModelResults) -> go.Figure:
