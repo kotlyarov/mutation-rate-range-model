@@ -12,7 +12,7 @@ This repository now contains:
 - a local Streamlit GUI for inspecting model behaviour
 - parameter validation and tests
 - plotting helpers
-- a scaffold for curated experimental data
+- an experimental-data scaffold for curated observations
 - an experimental-data inventory section in the app
 
 The project is **not calibrated yet**. The included experimental-data files are currently a schema/pipeline foundation, not final fitted biological data.
@@ -22,10 +22,10 @@ The project is **not calibrated yet**. The included experimental-data files are 
 From the repository root:
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-pytest
+python3 -m pip install -r requirements.txt
+python3 -m pytest
 streamlit run app/streamlit_app.py
 ```
 
@@ -36,6 +36,8 @@ http://localhost:8501/
 ```
 
 If Streamlit asks for an email address on first launch, it can be left blank.
+
+The app may print a warning about `urllib3`, LibreSSL, or Streamlit's `use_container_width` deprecation. These warnings do not necessarily stop the app from running, but the deprecation warning should be cleaned up in a future code update.
 
 ## Goal
 
@@ -234,7 +236,7 @@ Experimental observations should be used to constrain, compare, or falsify assum
 ## Development commands
 
 ```bash
-pytest
+python3 -m pytest
 streamlit run app/streamlit_app.py
 ```
 
@@ -258,6 +260,7 @@ Likely next development steps:
 1. curate real numeric observations from the registered sources
 2. separate placeholder/schema rows from real processed observations
 3. compare deterministic curves against curated data points
-4. add validation plots
-5. document which assumptions are supported, weakly supported, or contradicted
-6. only then consider calibration or stochastic simulation
+4. replace deprecated Streamlit `use_container_width` calls with `width`
+5. add validation plots
+6. document which assumptions are supported, weakly supported, or contradicted
+7. only then consider calibration or stochastic simulation
