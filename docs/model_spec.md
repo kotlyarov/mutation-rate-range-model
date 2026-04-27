@@ -1,394 +1,284 @@
 # Model Specification
 
-## Project name
+This document defines the first deterministic version of the Mutation Rate Range Model.
 
-Mutation Rate Range Model
+## Scope
 
-## Purpose
+The first version is a deterministic curve model. It should be simple, inspectable, and easy to test.
 
-Build a reproducible local model to estimate the mutation-rate range in which an *E. coli*-like asexual population can improve selected-environment fitness over long periods without excessive genome decay.
+It should not include:
 
-The model should be useful for reasoning about LTEE-like evolution and mutator trade-offs.
+- stochastic Wright-Fisher simulation
+- Approximate Bayesian Computation
+- Bayesian hierarchical fitting
+- real-data parameter inference
+- automatic scientific claims
 
-## Central research question
+Those may be added later.
 
-What mutation-rate range allows long-term adaptive improvement while keeping deleterious load and genome decay below a chosen cost threshold?
+## Inputs
 
-## Scientific background
+The core inputs are:
 
-This project is based on the following scientific observations:
+```text
+m = mutation-rate multiplier relative to wild type
+T = number of generations
+```
 
-1. Mutation rate can accelerate adaptation by increasing the supply of beneficial mutations.
-2. Mutation rate also increases deleterious and lethal mutation supply.
-3. Hypermutator lineages can gain selected-environment fitness while accumulating genome decay.
-4. Very high mutation rates can limit adaptation.
-5. The optimal or viable mutation-rate range depends on population size, environment, time horizon, DFE, and decay penalty.
+The model evaluates a vector of mutation-rate multipliers:
 
-## Model philosophy
+```text
+m_values = [m_min, ..., m_max]
+```
 
-Do not attempt to calculate the exact effect of every possible genomic change.
+Example default range:
 
-Instead, model empirical curves:
+```text
+m_min = 0.1
+m_max = 100.0
+n_points = 400
+```
 
-Benefit curve:
-  mutation rate -> selected-environment fitness gain
+Use log-spaced mutation-rate values by default because the biologically interesting range may span orders of magnitude.
 
-Cost curve:
-  mutation rate -> genome decay / deleterious load
+## Core outputs
 
-Robustness curve:
-  mutation rate -> retained alternative-environment capacity
+The first model computes:
 
-Net curve:
-  benefit - weighted cost + robustness value
+```text
+B(m, T) = selected-environment adaptive benefit
+D(m, T) = mutation-accumulation / genome-decay proxy
+R(m, T) = retained robustness
+S(m, T) = net long-term score
+```
 
-Use uncertainty bands rather than false precision.
+The net score is:
 
-## Main variables
+```text
+S(m, T) = B(m, T) - lambda_decay * D(m, T) + rho_robustness * R(m, T)
+```
 
-mu0       wild-type mutation rate
-m         mutation-rate multiplier relative to wild type
-mu        mu0 * m
+Where:
 
-T         number of generations
-Ne        effective population size
+```text
+lambda_decay = penalty weight for mutation accumulation / genome decay
+rho_robustness = reward weight for retained robustness
+```
 
-Ub        beneficial mutation rate per genome per generation
-Ud        deleterious mutation rate per genome per generation
-Ul        lethal mutation rate per genome per generation
+## Interpretation of terms
 
-B(m, T)   selected-environment adaptive benefit
-D(m, T)   genome-decay / deleterious-load cost
-R(m, T)   retained robustness / alternative-environment capacity
-S(m, T)   net long-term score
+### Adaptive benefit: `B(m, T)`
 
-## First deterministic model
+`B` represents selected-environment fitness gain.
 
-Use a deliberately simple first model.
+It should generally:
 
-B(m, T) = Bmax * (1 - exp(-kb * m * T)) * exp(-hb * max(0, m - m_burn)^p)
+- be non-negative
+- increase with generation horizon
+- increase with mutation rate at low-to-moderate mutation rates
+- saturate or decline at high mutation rates if deleterious interference is included
 
-Interpretation:
+A simple first form:
 
-* At low mutation rates, more mutations increase adaptive opportunity.
-* Benefit saturates as adaptation approaches a local limit.
-* At high mutation rates, deleterious load, clonal interference, or mutation burden can reduce realised adaptation.
+```text
+beneficial_supply(m) = 1 - exp(-alpha_benefit * m * T_scaled)
+interference(m) = 1 / (1 + beta_interference * m^gamma_interference)
 
-Parameters:
+B(m, T) = benefit_scale * beneficial_supply(m) * interference(m)
+```
 
-Bmax    maximum selected-environment adaptive benefit
-kb      adaptation benefit coefficient
-hb      high-mutation-rate harm coefficient
-m_burn  mutation-rate multiplier where high-rate harm begins
-p       high-rate harm curvature
+Where:
 
-## Genome-decay curve:
+```text
+T_scaled = T / T_ref
+```
 
-D(m, T) = kd * (m^alpha) * T + ke * (m^beta) * (T^gamma)
+### Decay proxy: `D(m, T)`
 
-Interpretation:
+`D` represents a scalar proxy for mutation accumulation, deleterious load, and inferred genome-integrity loss.
 
-* Genome decay increases with mutation rate and time.
-* The second term allows nonlinear accumulation caused by epistasis, hitchhiking, or compounding damage.
+It should generally:
 
-Parameters:
+- be non-negative
+- increase with mutation rate
+- increase with generation horizon
+- be allowed to accelerate at high mutation rates
 
-kd      linear decay coefficient
-ke      nonlinear / epistatic decay coefficient
-alpha   mutation-rate exponent for linear decay
-beta    mutation-rate exponent for nonlinear decay
-gamma   time exponent for nonlinear decay
+A simple first form:
 
-## Robustness curve
+```text
+D(m, T) = decay_scale * (m^gamma_decay) * T_scaled
+```
 
-R(m, T) = exp(-kr * D(m, T))
+Important: `D` is not a literal count of harmful mutations. It is a modelling proxy.
 
-Interpretation:
+### Robustness: `R(m, T)`
 
-* Robustness decreases as decay accumulates.
-* Robustness represents retained ability to handle alternative environments, stress, or future adaptation.
+`R` represents retained robustness in alternative or future environments.
 
-Parameters:
+It should generally:
 
-kr      robustness-loss coefficient
+- be bounded between 0 and 1
+- decline as mutation accumulation increases
+- remain interpretable as a relative score, not a direct measurement
+
+A simple first form:
+
+```text
+R(m, T) = exp(-k_robustness * D(m, T))
+```
 
 ## Net score
 
+The net score combines the three outputs:
+
+```text
 S(m, T) = B(m, T) - lambda_decay * D(m, T) + rho_robustness * R(m, T)
+```
 
-Interpretation:
+This score is not biological truth. It is an assumption-dependent utility score for exploring trade-offs.
 
-* Selected-environment fitness is good.
-* Genome decay is bad.
-* Retained robustness is good.
+## Derived range estimates
 
-Parameters:
+The model should estimate:
 
-lambda_decay   penalty weight for genome decay
-rho_robustness value weight for retained robustness
+```text
+mu_peak = m where S(m, T) is maximal
+mu_min = lowest m that reaches a threshold fraction of peak benefit
+mu_max = highest m before net score or decay threshold becomes unacceptable
+```
 
-## Mutation-rate range outputs
+Suggested default rules:
 
-For each parameter set, calculate:
+```text
+benefit_threshold_fraction = 0.80
+decay_threshold_fraction = 0.80
+net_threshold_fraction = 0.80
+```
 
-mu_min:
-  lowest mutation-rate multiplier where net score becomes meaningfully positive
+Possible definitions:
 
-mu_peak:
-  mutation-rate multiplier where net score is maximal
+```text
+mu_min = lowest m where B(m, T) >= benefit_threshold_fraction * max(B)
 
-mu_max:
-  highest mutation-rate multiplier before net score falls below acceptable threshold
+mu_peak = m at max(S)
 
-If no internal optimum exists, report that directly.
+mu_max = highest m where:
+  S(m, T) >= net_threshold_fraction * max(S)
+  and D(m, T) <= decay_threshold_fraction * max(D)
+```
 
-## Uncertainty handling
+These rules must be configurable and clearly labelled.
 
-The model must support parameter uncertainty.
+## Default parameter object
 
-Implement:
+Suggested first parameter object:
 
-sample_params(base_params, uncertainty_spec, n, seed)
+```text
+T = 50000
+T_ref = 50000
 
-For each curve, output:
+m_min = 0.1
+m_max = 100.0
+n_points = 400
 
-median
-5th percentile
-95th percentile
+benefit_scale = 1.0
+alpha_benefit = 1.0
+beta_interference = 0.01
+gamma_interference = 1.0
 
-The GUI must show uncertainty bands.
+decay_scale = 1.0
+gamma_decay = 1.2
 
-## Sensitivity analysis
+k_robustness = 0.05
 
-The model must estimate which parameters most affect:
+lambda_decay = 0.2
+rho_robustness = 0.1
 
-mu_min
-mu_peak
-mu_max
+benefit_threshold_fraction = 0.80
+net_threshold_fraction = 0.80
+decay_threshold_fraction = 0.80
+```
 
-At minimum, implement one-at-a-time sensitivity sweeps.
+These defaults are placeholders for exploration. They must not be presented as fitted biological values.
 
-Later versions may include Sobol sensitivity analysis.
+## Required functions
 
-## GUI requirements
+Implement pure functions similar to:
 
-Use Streamlit.
+```python
+def make_m_values(params) -> np.ndarray:
+    ...
 
-Required screens:
+def adaptive_benefit(m_values: np.ndarray, params) -> np.ndarray:
+    ...
 
-1. Overview
+def decay_proxy(m_values: np.ndarray, params) -> np.ndarray:
+    ...
 
-Show:
+def robustness(m_values: np.ndarray, decay_values: np.ndarray, params) -> np.ndarray:
+    ...
 
-* model version
-* current parameter set
-* current mutation-rate range
-* warnings
+def net_score(
+    benefit_values: np.ndarray,
+    decay_values: np.ndarray,
+    robustness_values: np.ndarray,
+    params,
+) -> np.ndarray:
+    ...
 
-2. Parameter controls
+def estimate_range(
+    m_values: np.ndarray,
+    benefit_values: np.ndarray,
+    decay_values: np.ndarray,
+    robustness_values: np.ndarray,
+    score_values: np.ndarray,
+    params,
+) -> dict:
+    ...
+```
 
-Controls for:
+## Validation rules
 
-mu0
-T
-Ne
-Bmax
-kb
-hb
-m_burn
-p
-kd
-ke
-alpha
-beta
-gamma
-kr
-lambda_decay
-rho_robustness
-m_min
-m_max
-m_points
-bootstrap_samples
-random_seed
+For valid inputs:
 
-3. Curve viewer
+- all output arrays must match the shape of `m_values`
+- no output should contain NaN or infinity
+- `B` must be non-negative
+- `D` must be non-negative
+- `R` must be between 0 and 1
+- `mu_peak` must be one of the evaluated `m_values`
+- invalid parameters must raise clear exceptions
 
-Plot:
+## GUI behaviour
 
-B(m, T)
-D(m, T)
-R(m, T)
-S(m, T)
+The GUI should show:
 
-4. Phase diagram
+- adaptive benefit curve
+- decay proxy curve
+- robustness curve
+- net-score curve
+- selected parameter values
+- estimated `mu_min`, `mu_peak`, and `mu_max`
+- warning that outputs are assumption-dependent
 
-Heatmap:
+The GUI must not say that the model has discovered the true optimal mutation rate.
 
-x-axis: mutation-rate multiplier
-y-axis: generation horizon
-colour: net score
+## Output language
 
-5. Sensitivity analysis
+Use cautious language:
 
-Rank parameters by effect on:
+```text
+Under current assumptions...
+The model estimates...
+The score peaks near...
+The result is sensitive to...
+```
 
-mu_min
-mu_peak
-mu_max
+Avoid:
 
-6. Evidence panel
-
-For every fitted/default parameter, show:
-
-source
-status
-confidence
-notes
-
-Statuses:
-
-source-backed
-fitted
-placeholder
-sensitivity-only
-
-## Initial parameter schema
-
-Create a Pydantic model:
-
-class ModelParams(BaseModel):
-    mu0: float
-    generations: int
-    ne: float
-
-    bmax: float
-    kb: float
-    hb: float
-    m_burn: float
-    p: float
-
-    kd: float
-    ke: float
-    alpha: float
-    beta: float
-    gamma: float
-    kr: float
-
-    lambda_decay: float
-    rho_robustness: float
-
-    m_min: float
-    m_max: float
-    m_points: int
-
-Add validation:
-
-all rates must be positive
-generation count must be positive
-m_max > m_min
-m_points >= 10
-exponents must be positive
-
-## Required modules
-
-src/mrrm/parameters.py
-  Pydantic schemas and default parameter sets
-
-src/mrrm/curves.py
-  deterministic benefit, decay, robustness, and net-score functions
-
-src/mrrm/sensitivity.py
-  one-at-a-time parameter sweeps
-
-src/mrrm/validation.py
-  qualitative validation checks
-
-src/mrrm/plotting.py
-  reusable Plotly figures
-
-app/streamlit_app.py
-  GUI only; no model logic
-
-## Required tests
-
-Tests must verify:
-
-benefit increases at low mutation rate
-decay increases with mutation rate
-robustness decreases as decay increases
-net score can have an internal peak
-higher decay penalty shifts optimum downward
-higher benefit coefficient shifts optimum upward
-invalid parameters fail validation
-fixed seeds produce reproducible uncertainty bands
-
-## Validation targets
-
-The model should reproduce qualitative findings:
-
-V1. Increasing mutation rate can accelerate short-term adaptation.
-V2. Very high mutation rates can limit adaptation.
-V3. Hypermutators can gain selected-environment fitness while genome decay accumulates.
-V4. Longer time horizon can shift optimal mutation rate downward when decay matters.
-V5. Higher decay penalty shifts the optimum downward.
-V6. Higher beneficial opportunity shifts the optimum upward.
-
-## Later stochastic model
-
-After the deterministic model is working, add a stochastic simulator.
-
-Possible structure:
-
-population state:
-  fitness
-  deleterious load
-  lethal fraction
-  genome integrity
-  robustness
-  mutation-rate class
-
-events:
-  beneficial mutation
-  weakly deleterious mutation
-  strongly deleterious mutation
-  lethal mutation
-  mutator mutation
-  antimutator mutation
-
-Possible methods:
-
-Wright-Fisher approximation
-branching process approximation
-Approximate Bayesian Computation
-particle filter / state-space model
-
-Do not add this until the deterministic version is tested and documented.
-
-## Output report
-
-Generate:
-
-reports/first_model_report.md
-
-It must include:
-
-model version
-parameter set
-assumptions
-curve plots
-mutation-rate range
-sensitivity results
-known limitations
-failed validation checks
-
-## Failure policy
-
-The model must report when:
-
-no optimum exists
-the optimum is outside the search range
-the result is dominated by uncertain parameters
-the curves behave biologically unrealistically
-the data cannot support the requested conclusion
-
-Never tune parameters only to produce a nice-looking answer.
+```text
+The optimal mutation rate is...
+Evolution chooses...
+This proves...
+```

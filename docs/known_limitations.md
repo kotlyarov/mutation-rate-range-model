@@ -1,165 +1,125 @@
 # Known Limitations
 
-This project is an exploratory scientific model, not a complete biological simulation.
+This document lists known limitations of the first deterministic version of the Mutation Rate Range Model.
 
-## 1. It does not know the exact cost of every mutation
+## The model is exploratory
 
-The model cannot calculate the exact fitness effect of every possible genomic change in *E. coli*.
+The first model is intended to test whether assumptions produce biologically plausible curve shapes.
 
-Many mutation effects depend on:
+It does not estimate a true biological optimum.
 
-environment
-genetic background
-epistasis
-gene expression
-metabolic state
-population dynamics
+## No exact mutation effects
 
-The project uses empirical curves and uncertainty bands instead.
+The model does not know the exact cost or benefit of each possible mutation.
 
-## 2. Genome-decay cost is partly subjective
+Instead, it uses aggregate curves for:
 
-Genome decay can be measured in several ways:
+```text
+adaptive benefit
+mutation-accumulation / genome-decay proxy
+retained robustness
+net score
+```
 
-lost genes
-lost metabolic functions
-reduced fitness in alternative environments
-deleterious load
-reduced future adaptability
+## Simplified genome decay
 
-There is no single universal cost function.
+`D(m, T)` is a scalar proxy.
 
-The model exposes the decay penalty as a parameter rather than hiding it.
+It may combine several distinct biological processes:
 
-## 3. LTEE-like conditions are not all natural conditions
+- mutation accumulation
+- deleterious load
+- relaxed selection
+- loss of conditionally useful functions
+- reduced robustness
+- genome degradation
 
-The LTEE is a powerful experiment, but it is a simplified laboratory environment.
+These should not be treated as identical in scientific interpretation.
 
-A mutation-rate range that works in LTEE-like glucose-limited conditions may not apply to:
+## No explicit population genetics in version one
 
-soil
-gut microbiomes
-fluctuating environments
-host-pathogen interactions
-small populations
-sexually recombining organisms
-large eukaryotic genomes
+The first version does not explicitly model:
 
-## 4. Mutation rate is not only one number
+- individual organisms
+- genetic drift
+- fixation probabilities
+- clonal interference
+- population bottlenecks
+- hitchhiking
+- lineage structure
+- extinction risk
 
-Different mutator mechanisms can change the mutation spectrum.
+Some of these effects may be approximated indirectly by parameters, but they are not simulated.
 
-For example, one mutator may increase mostly transitions, while another may increase indels or structural changes.
+## No real-data fitting yet
 
-The first model treats mutation rate mostly as a scalar multiplier, which is incomplete.
+Until fitting and validation code exist, parameters are exploratory.
 
-## 5. Epistasis is simplified
+The model should not claim that defaults are empirically estimated.
 
-The first model uses nonlinear terms to approximate compound damage and interaction between mutations.
+## No mutation spectrum
 
-It does not infer a full genome-wide epistasis map.
+The first model treats mutation rate as a single multiplier.
 
-A complete epistasis map would require enormous experimental data, including engineered combinations of mutations and growth measurements across environments.
+It does not distinguish:
 
-## 6. Benefit and cost curves may be non-identifiable
+- transitions
+- transversions
+- indels
+- structural variants
+- DNA repair defects
+- context-dependent mutation biases
+- mutation-spectrum evolution
 
-Different parameter sets may produce similar net curves.
+## No environment switching
 
-Therefore, the model must show:
+The selected environment is treated as stable.
 
-uncertainty bands
-sensitivity analysis
-parameter provenance
-warnings when results are underdetermined
+The robustness term is only a proxy for performance outside the selected environment.
 
-## 7. The model may create false visual confidence
+## No universal optimum
 
-A GUI can make a weak model look authoritative.
+A mutation-rate range estimated under one parameter set does not apply universally.
 
-Every chart must show:
+The result may change with:
 
-assumptions
-parameter source status
-uncertainty
-warnings
+- environment
+- population size
+- generation horizon
+- benefit distribution
+- deleterious-load assumptions
+- robustness weighting
+- mutation spectrum
+- threshold choices
 
-## 8. The model is not a proof about evolution in general
+## Risk of false precision
 
-The project estimates mutation-rate trade-offs under specified assumptions.
+The GUI may make arbitrary parameters look authoritative.
 
-It should not be used to claim a universal mutation-rate range for all life.
+To reduce this risk:
 
-The result is conditional on:
+- display assumptions clearly
+- avoid excessive decimal precision
+- show sensitivity analysis
+- label outputs as exploratory
+- keep default parameters visibly provisional
 
-organism
-environment
-population size
-generation horizon
-fitness definition
-decay penalty
+## Risk of circular reasoning
 
-## 9. Data sources are related but not identical
+If the model is tuned to produce a desired peak, it may only confirm the modeller's assumptions.
 
-The model may combine data from LTEE, mutator studies, mutation-accumulation studies, and controlled mutation-rate experiments.
+Validation must compare curve behaviour against independent empirical patterns where possible.
 
-These sources are not perfectly interchangeable.
+## Current safe interpretation
 
-The project must document when a parameter comes from a different environment, strain, or experimental design.
+A safe interpretation is:
 
-## 10. Initial model is deterministic
+```text
+Under these assumptions, the model produces a plausible trade-off curve with a peak in this approximate range.
+```
 
-The first version uses deterministic curves.
+An unsafe interpretation is:
 
-This is useful for transparency but cannot capture all population-genetic dynamics, including:
-
-drift
-clonal interference
-lineage extinction
-hitchhiking
-rare innovation events
-mutation-rate modifier dynamics
-
-Later versions should add stochastic simulation.
-
-## 11. The model may fail to produce a clear optimum
-
-Some parameter combinations may produce:
-
-monotonic benefit
-monotonic harm
-flat net score
-optimum outside tested range
-extreme sensitivity to decay penalty
-
-These are valid outcomes and must be reported.
-
-## 12. It does not model Cit+ directly
-
-The first version is about mutation-rate trade-offs and genome decay.
-
-It does not directly model the evolution of aerobic citrate use.
-
-Cit+ could be added later as a special rare-innovation module with:
-
-potentiation
-actualization
-refinement
-lineage survival
-
-## 13. Parameter precision is limited
-
-Even well-studied variables such as wild-type mutation rate, beneficial mutation supply, and deleterious DFE vary by strain, environment, measurement method, and time.
-
-The project should use parameter ranges and uncertainty rather than single hard-coded constants.
-
-## 14. Validation is initially qualitative
-
-Early validation checks whether the model behaves consistently with known findings.
-
-Quantitative validation requires curated datasets and careful fitting.
-
-## 15. The model cannot replace experiments
-
-The model can suggest plausible ranges and identify sensitive assumptions.
-
-It cannot prove the true biological optimum without experimental validation.
+```text
+The model proves that evolution optimises mutation rate at this value.
+```

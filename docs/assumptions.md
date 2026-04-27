@@ -1,166 +1,131 @@
 # Assumptions
 
-This document lists the assumptions used by the mutation-rate range model.
+This document lists assumptions used by the first deterministic version of the Mutation Rate Range Model.
 
-The project must keep assumptions explicit. No assumption should be hidden inside code.
+## General assumptions
 
-## A1. Mutation rate affects both beneficial and deleterious mutation supply
+The first model assumes:
 
-Increasing mutation rate increases the supply of potentially beneficial mutations, but also increases the supply of neutral, deleterious, and lethal mutations.
+- an *E. coli*-like asexual population
+- mutation rate is represented as a multiplier relative to wild type
+- selected-environment fitness and genome integrity can be represented separately
+- model outputs are approximate curves, not exact biological measurements
+- results are conditional on parameter choices
 
-The model does not assume that mutation knows whether a future change will be useful.
+## Biological assumptions
 
-## A2. Beneficial effect is environment-dependent
+### Asexual population
 
-A mutation that improves growth in one environment may be neutral or harmful in another environment.
+The first version assumes no recombination.
 
-The first model focuses on an LTEE-like selected environment but includes a separate robustness term for alternative environments.
+This is reasonable for a simplified LTEE-like model, but it limits generality.
 
-## A3. Selected-environment fitness and genome integrity are different outputs
+### Constant selected environment
 
-A population can improve fitness in the selected environment while losing broader genomic functionality.
+The selected environment is treated as stable across the generation horizon.
 
-This is one of the main lessons from mutator genome decay research.
+This allows selected-environment fitness gain to be modelled separately from robustness in alternative environments.
 
-Therefore, the model tracks:
+### Mutation-rate multiplier
 
-selected-environment benefit
-genome decay
-retained robustness
-net score
+Mutation rate is represented as:
 
-## A4. Genome decay cost is not directly known
+```text
+m = mutation-rate multiplier relative to wild type
+```
 
-The cost of genome decay depends on what future environments or functions matter.
+The model does not initially distinguish between:
 
-The model does not treat genome decay cost as a universal biological constant.
+- point mutations
+- indels
+- structural variants
+- spectrum changes
+- context-dependent mutation biases
 
-Instead, it exposes a decay penalty:
+Later versions may separate mutation rate and mutation spectrum.
 
-lambda_decay
+### Adaptive benefit
 
-Higher values mean that genome integrity and future robustness are considered more important.
+The first version assumes selected-environment adaptive benefit increases with mutation supply at low-to-moderate mutation rates, then saturates or declines when interference or deleterious load becomes important.
 
-## A5. Mutation-rate optimum is not universal
+### Genome decay proxy
 
-The optimal mutation-rate range depends on:
+The first version assumes mutation accumulation and genome-integrity loss can be approximated by a scalar proxy:
 
-population size
-environment
-time horizon
-genome size
-mutation spectrum
-distribution of fitness effects
-epistasis
-strength of selection
-importance of alternative environments
-
-The model estimates conditional ranges, not universal constants.
-
-## A6. Exact per-mutation costs are not assumed
-
-The model does not attempt to calculate the exact cost of every possible base-pair change.
-
-Instead, it uses empirical or fitted curves:
-
-benefit curve
-decay curve
-robustness curve
-net curve
-
-## A7. Curves must include uncertainty
-
-Every major curve should be displayed with uncertainty bands where possible.
-
-The model should prefer: range with uncertainty
-
-over: single precise number
-
-## A8. Early adaptation and late adaptation may differ
-
-Beneficial mutations are usually more available early in adaptation and less available later.
-
-The first deterministic model approximates this using saturating benefit curves.
-
-Later versions may model time-varying beneficial opportunity explicitly.
-
-## A9. High mutation rates can become harmful
-
-The model assumes that high mutation rates may eventually reduce net performance through:
-
-deleterious load
-lethal mutations
-genome decay
-clonal interference
-loss of robustness
-
-This assumption is experimentally supported but the threshold is parameter-dependent.
-
-## A10. Robustness is a proxy
-
-The robustness curve is not a direct physical measurement.
-
-It represents retained capacity to perform in alternative environments, withstand stress, and preserve future adaptability.
-
-In early versions, robustness is modelled as a function of genome decay:
-
-R(m, T) = exp(-kr * D(m, T))
+```text
+D(m, T)
+```
 
 This is a simplification.
 
-## A11. Mutation spectrum is initially simplified
+`D` is not a direct count of deleterious mutations and not a direct measurement of lost genes.
 
-The first model treats mutation rate mostly as a scalar multiplier.
+### Robustness
 
-This is incomplete because different mutator mechanisms can produce different mutation spectra.
+The first version assumes retained robustness can be represented as a bounded score:
 
-Later versions should distinguish:
+```text
+0 <= R(m, T) <= 1
+```
 
-base substitutions
-insertions
-deletions
-structural variants
-mobile-element insertions
-repair-defect-specific spectra
+This is a proxy for the ability to retain performance outside the selected environment.
 
-## A12. Epistasis is initially coarse-grained
+### Net score
 
-The first model does not infer all pairwise or higher-order genetic interactions.
+The net score is an artificial utility score:
 
-Instead, nonlinear decay terms approximate compound damage and epistasis.
+```text
+S(m, T) = B(m, T) - lambda_decay * D(m, T) + rho_robustness * R(m, T)
+```
 
-Later versions may add:
+It is useful for comparing assumptions, not for declaring a biological law.
 
-global epistasis
-gene-category epistasis
-synthetic-lethal risk
-state-space hidden decay variables
+## Modelling assumptions
 
-## A13. Model parameters must have provenance
+### Deterministic curves first
 
-Every parameter must be labelled as one of:
+The first version does not simulate individuals, lineages, fixation, drift, or clonal interference directly.
 
-source-backed
-fitted
-placeholder
-sensitivity-only
+Instead, these effects are represented indirectly through curve shapes and parameters.
 
-Placeholder parameters must not be presented as established scientific values.
+### Log-spaced mutation-rate range
 
-## A14. Qualitative validation is required before quantitative claims
+Mutation-rate multipliers should usually be evaluated on a log scale because biologically relevant differences can span orders of magnitude.
 
-The model must first reproduce qualitative expectations:
+### Configurable thresholds
 
-benefit increases at low mutation rate
-decay increases with mutation rate
-robustness decreases with decay
-very high mutation rate can reduce net score
-increasing decay penalty lowers the optimum
+`mu_min` and `mu_max` are threshold-based estimates, not direct biological constants.
 
-Only after these checks pass should quantitative ranges be discussed.
+Thresholds must remain configurable.
 
-## A15. No theory-confirming tuning
+### Defaults are not fitted values
 
-Do not tune parameters to force a preferred conclusion.
+Default parameters are placeholders for model exploration.
 
-If the model does not produce a clear optimum, or if the result depends heavily on an uncertain parameter, report that directly.
+They must not be described as inferred from real data unless fitting code and validation reports are later added.
+
+## Reporting assumptions
+
+Any result must include language similar to:
+
+```text
+Under the selected assumptions and parameter ranges...
+```
+
+Do not report outputs as unconditional facts.
+
+## Assumptions to revisit later
+
+Later versions should revisit:
+
+- mutation spectrum
+- epistasis
+- changing distribution of fitness effects
+- population size
+- bottlenecks
+- clonal interference
+- drift
+- environmental change
+- robustness across many alternative environments
+- parameter fitting from empirical data
+- uncertainty propagation
