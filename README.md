@@ -10,7 +10,15 @@ This repository is at the specification stage.
 
 It currently contains project documentation and modelling requirements. The Python implementation, curated datasets, fitted parameters, and validation reports are not yet complete.
 
-The first implementation should be deliberately small: deterministic curves, tests, and a minimal local interface for inspecting model behaviour.
+The first initial deterministic implementation exists.
+
+To run the first implementation use:
+
+```text
+source .venv/bin/activate
+streamlit run app/streamlit_app.py
+```
+It should open the model on http://localhost:8501/
 
 ## Goal
 
