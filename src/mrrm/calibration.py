@@ -10,6 +10,8 @@ import numpy as np
 from .data_loaders import load_calibration_dataset
 from .parameters import ModelParameters
 
+SUPPORTED_STRAINS = ("MRS", "MRM", "MRL", "MRXL")
+
 PROVENANCE_EMPIRICAL = "Empirical"
 PROVENANCE_FITTED = "Fitted"
 PROVENANCE_ASSUMED = "Assumed"
@@ -63,7 +65,11 @@ class CalibrationResult:
     estimates: dict[str, ParameterEstimate]
     observation_count: int
     fitness_observation_count: int
+    missing_fitness_observation_count: int
     decay_observation_count: int
+    selected_strain: str | None
+    target_generation: float | None
+    closest_generation: int | None
 
     def provenance_rows(self) -> list[dict[str, Any]]:
         return [self.estimates[name].as_dict() for name in model_parameter_names()]
@@ -75,23 +81,108 @@ def model_parameter_names() -> list[str]:
     return [field.name for field in fields(ModelParameters)]
 
 
+def available_strains(observations: list[dict[str, Any]]) -> list[str]:
+    """Return supported strains present in calibration observations."""
+
+    observed = {row["strain_or_population"] for row in observations}
+    ordered = [strain for strain in SUPPORTED_STRAINS if strain in observed]
+    extras = sorted(observed - set(SUPPORTED_STRAINS))
+    return ordered + extras
+
+
+def available_generations(
+    observations: list[dict[str, Any]],
+    strain: str | None = None,
+) -> list[int]:
+    """Return observed generations for a strain or the full dataset."""
+
+    generations = {
+        row["generation"]
+        for row in observations
+        if row.get("generation") is not None
+        and (strain is None or row.get("strain_or_population") == strain)
+    }
+    return sorted(generations)
+
+
+def closest_observed_generation(
+    observations: list[dict[str, Any]],
+    target_generation: float | None,
+    strain: str | None = None,
+) -> int | None:
+    """Find the observed generation closest to the requested model horizon."""
+
+    generations = available_generations(observations, strain=strain)
+    if not generations:
+        return None
+    if target_generation is None:
+        positive = [generation for generation in generations if generation > 0]
+        return max(positive or generations)
+    return min(generations, key=lambda generation: abs(generation - target_generation))
+
+
+def select_calibration_observations(
+    observations: list[dict[str, Any]],
+    strain: str | None = None,
+    target_generation: float | None = None,
+) -> list[dict[str, Any]]:
+    """Select strain and closest-generation rows that drive calibration."""
+
+    selected = [
+        row
+        for row in observations
+        if strain is None or row.get("strain_or_population") == strain
+    ]
+    if target_generation is None:
+        return selected
+    closest = closest_observed_generation(selected, target_generation)
+    if closest is None:
+        return selected
+    generation_rows = [
+        row
+        for row in selected
+        if row.get("generation") == closest
+    ]
+    return generation_rows or selected
+
+
 def derive_calibrated_parameters(
     observations: list[dict[str, Any]] | None = None,
     base_params: ModelParameters | None = None,
+    strain: str | None = None,
+    target_generation: float | None = None,
 ) -> CalibrationResult:
     """Derive model inputs from calibration observations where data support it."""
 
     observations = observations if observations is not None else load_calibration_dataset()
     base_params = base_params or ModelParameters()
+    selected_observations = select_calibration_observations(
+        observations,
+        strain=strain,
+        target_generation=target_generation,
+    )
+    closest = closest_observed_generation(
+        observations,
+        target_generation,
+        strain=strain,
+    )
     updates: dict[str, float | int] = {}
     estimates: dict[str, ParameterEstimate] = {}
 
-    _derive_mutation_axis(observations, base_params, updates, estimates)
-    _derive_generation_horizon(observations, base_params, updates, estimates)
+    _derive_mutation_axis(selected_observations, base_params, updates, estimates)
+    _derive_generation_horizon(
+        selected_observations,
+        base_params,
+        updates,
+        estimates,
+        target_generation=target_generation,
+        closest_generation=closest,
+    )
 
     working_params = replace(base_params, **updates)
-    fitness_rows = _rows_with_measurement(observations, "fitness")
-    decay_rows = _rows_with_decay_measurements(observations)
+    fitness_rows = _rows_with_measurement(selected_observations, "fitness")
+    missing_fitness_rows = _missing_rows_with_measurement(selected_observations, "fitness")
+    decay_rows = _rows_with_decay_measurements(selected_observations)
 
     if fitness_rows:
         fitted = _fit_benefit_parameters(fitness_rows, working_params)
@@ -104,8 +195,8 @@ def derive_calibrated_parameters(
                 lower=None,
                 upper=None,
                 provenance=PROVENANCE_FITTED,
-                source="calibration_dataset_v0 fitness-vs-control rows",
-                notes="Estimated by deterministic least-squares fit to exact fitness observations.",
+                source=_selected_source_label(strain, closest, "fitness-vs-control rows"),
+                notes="Estimated by deterministic least-squares fit to exact selected fitness observations.",
             )
 
     if decay_rows:
@@ -119,8 +210,8 @@ def derive_calibrated_parameters(
                 lower=None,
                 upper=None,
                 provenance=PROVENANCE_FITTED,
-                source="calibration_dataset_v0 mutation-count/genome-decay rows",
-                notes="Estimated by log-linear fit to exact decay-proxy observations.",
+                source=_selected_source_label(strain, closest, "mutation-count/genome-decay rows"),
+                notes="Estimated by log-linear fit to exact selected decay-proxy observations.",
             )
 
     params = replace(base_params, **updates)
@@ -128,9 +219,13 @@ def derive_calibrated_parameters(
     return CalibrationResult(
         params=params,
         estimates=estimates,
-        observation_count=len(observations),
+        observation_count=len(selected_observations),
         fitness_observation_count=len(fitness_rows),
+        missing_fitness_observation_count=len(missing_fitness_rows),
         decay_observation_count=len(decay_rows),
+        selected_strain=strain,
+        target_generation=target_generation,
+        closest_generation=closest,
     )
 
 
@@ -186,7 +281,34 @@ def _derive_generation_horizon(
     base_params: ModelParameters,
     updates: dict[str, float | int],
     estimates: dict[str, ParameterEstimate],
+    target_generation: float | None = None,
+    closest_generation: int | None = None,
 ) -> None:
+    if target_generation is not None:
+        horizon = float(max(target_generation, 1.0))
+        reference = float(closest_generation) if closest_generation and closest_generation > 0 else horizon
+        updates["T"] = horizon
+        updates["T_ref"] = reference
+        estimates["T"] = ParameterEstimate(
+            name="T",
+            value=horizon,
+            lower=None,
+            upper=None,
+            provenance=PROVENANCE_ASSUMED,
+            source="sidebar generation horizon",
+            notes="User-selected model horizon; also selects the closest experimental generation.",
+        )
+        estimates["T_ref"] = ParameterEstimate(
+            name="T_ref",
+            value=reference,
+            lower=reference,
+            upper=reference,
+            provenance=PROVENANCE_EMPIRICAL if closest_generation and closest_generation > 0 else PROVENANCE_ASSUMED,
+            source="closest selected experimental generation",
+            notes="Reference horizon for scaling curves to the selected data generation.",
+        )
+        return
+
     generations = [
         row["generation"]
         for row in observations
@@ -294,6 +416,15 @@ def _rows_with_measurement(observations: list[dict[str, Any]], token: str) -> li
     ]
 
 
+def _missing_rows_with_measurement(observations: list[dict[str, Any]], token: str) -> list[dict[str, Any]]:
+    return [
+        row
+        for row in observations
+        if token in row.get("measurement_kind", "")
+        and row.get("measurement_value") is None
+    ]
+
+
 def _rows_with_decay_measurements(observations: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         row
@@ -359,3 +490,12 @@ def _fit_decay_parameters(
         "decay_scale": float(np.exp(intercept) / T_scaled),
         "gamma_decay": float(slope),
     }
+
+
+def _selected_source_label(strain: str | None, generation: int | None, label: str) -> str:
+    pieces = ["calibration_dataset_v0", label]
+    if strain is not None:
+        pieces.append(f"strain={strain}")
+    if generation is not None:
+        pieces.append(f"generation={generation}")
+    return "; ".join(pieces)

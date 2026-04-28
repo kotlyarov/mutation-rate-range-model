@@ -261,6 +261,11 @@ def build_calibration_inventory(
             and observation["measurement_value"] is not None
             for observation in observations
         ),
+        "missing_fitness_observation_count": sum(
+            "fitness" in observation["measurement_kind"]
+            and observation["measurement_value"] is None
+            for observation in observations
+        ),
     }
 
 

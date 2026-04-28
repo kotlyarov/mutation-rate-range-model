@@ -24,7 +24,7 @@
       "download_method": "PLOS supplementary S3 Table downloaded manually from article file endpoint; Dryad phenotyping archive not imported.",
       "raw_filename": "data/raw/sprouffske_2018/s3_genomic_mutation_rates.xlsx",
       "processing_script": "manual curation into data/processed/calibration_dataset_v0.csv",
-      "notes": "Relevant for engineered E. coli mutation-rate treatments, selected-environment growth, robustness assays, and sequencing results. calibration_dataset_v0 currently includes only S3 genomic mutation-rate values and confidence intervals, not fitness values."
+      "notes": "Relevant for engineered E. coli mutation-rate treatments, selected-environment growth, robustness assays, and sequencing results. calibration_dataset_v0 currently includes S3 genomic mutation-rate values and confidence intervals, plus explicit missing-value slots for fitness/growth rows."
     },
     {
       "source_id": "couce_2017",

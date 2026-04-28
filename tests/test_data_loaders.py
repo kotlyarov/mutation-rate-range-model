@@ -133,14 +133,15 @@ def test_calibration_dataset_v0_loads_real_sprouffske_values():
         if row["observation_id"] == "sprouffske_2018_s3_mrxl_ancestor_U"
     )
 
-    assert len(observations) == 34
+    assert len(observations) == 68
     assert ancestor["measurement_value"] == 0.00034
     assert ancestor["measurement_lower"] == 0.00025
     assert ancestor["measurement_upper"] == 0.00045
     assert ancestor["mutation_rate_multiplier"] == 1.0
     assert mrxl["measurement_value"] == 0.03596
     assert mrxl["mutation_rate_multiplier"] > 100
-    assert all(row["uncertainty_type"] == "interval" for row in observations)
+    assert sum(row["uncertainty_type"] == "interval" for row in observations) == 34
+    assert sum(row["uncertainty_type"] == "missing" for row in observations) == 34
     assert all(row["calibration_role"] == "raw_observation_not_fit" for row in observations)
 
 
@@ -148,10 +149,14 @@ def test_calibration_inventory_is_data_first_not_fit():
     inventory = build_calibration_inventory()
 
     assert inventory["dataset_version"] == "calibration_dataset_v0"
-    assert inventory["observation_count"] == 34
+    assert inventory["observation_count"] == 68
     assert inventory["fitness_observation_count"] == 0
-    assert inventory["measurement_kinds"] == {"genomic_mutation_rate_U": 34}
-    assert inventory["calibration_roles"] == {"raw_observation_not_fit": 34}
+    assert inventory["missing_fitness_observation_count"] == 34
+    assert inventory["measurement_kinds"] == {
+        "genomic_mutation_rate_U": 34,
+        "relative_fitness": 34,
+    }
+    assert inventory["calibration_roles"] == {"raw_observation_not_fit": 68}
 
 
 def test_calibration_interval_rows_require_interval_bounds(tmp_path):

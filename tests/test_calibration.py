@@ -4,7 +4,10 @@ import pytest
 
 from mrrm.calibration import (
     PROVENANCE_EMPIRICAL,
+    PROVENANCE_FITTED,
     PROVENANCE_UNSUPPORTED,
+    available_generations,
+    available_strains,
     derive_calibrated_parameters,
 )
 from mrrm.curves import evaluate_model
@@ -36,6 +39,7 @@ def test_unsupported_parameters_are_not_silently_presented_as_fitted():
     calibration = derive_calibrated_parameters()
 
     assert calibration.fitness_observation_count == 0
+    assert calibration.missing_fitness_observation_count == 34
     assert calibration.decay_observation_count == 0
     assert calibration.estimates["beta_interference"].provenance == PROVENANCE_UNSUPPORTED
     assert calibration.estimates["gamma_decay"].provenance == PROVENANCE_UNSUPPORTED
@@ -60,3 +64,57 @@ def test_calibrated_thresholds_are_sensitive_to_observed_mutation_axis():
     assert full.m_values[-1] == pytest.approx(168.16)
     assert narrow.m_values[-1] == pytest.approx(10.0)
     assert full.range_estimate.mu_max != narrow.range_estimate.mu_max
+
+
+def test_available_strains_and_generations_support_ui_selectors():
+    observations = load_calibration_dataset()
+
+    assert available_strains(observations) == ["MRS", "MRM", "MRL", "MRXL"]
+    assert available_generations(observations, "MRXL") == [0, 3000]
+
+
+def test_selected_strain_and_generation_drive_calibrated_axis():
+    observations = load_calibration_dataset()
+    mrs = derive_calibrated_parameters(observations, strain="MRS", target_generation=3000)
+    mrxl = derive_calibrated_parameters(observations, strain="MRXL", target_generation=3000)
+
+    assert mrs.selected_strain == "MRS"
+    assert mrs.closest_generation == 3000
+    assert mrs.params.m_max == pytest.approx(16.92)
+    assert mrxl.params.m_max == pytest.approx(75.04)
+    assert evaluate_model(mrs.params).range_estimate.mu_max != evaluate_model(mrxl.params).range_estimate.mu_max
+
+
+def test_exact_fitness_rows_fit_benefit_parameters_when_curated():
+    observations = load_calibration_dataset()
+    enriched = []
+    fitness_values = [0.04, 0.02, 0.025, 0.05, 0.01, 0.03]
+    fitness_index = 0
+    for row in observations:
+        if (
+            row["strain_or_population"] == "MRS"
+            and row["generation"] == 3000
+            and row["measurement_kind"] == "relative_fitness"
+        ):
+            value = fitness_values[fitness_index]
+            fitness_index += 1
+            enriched.append(
+                {
+                    **row,
+                    "measurement_value": value,
+                    "measurement_lower": max(value - 0.005, 0.0),
+                    "measurement_upper": value + 0.005,
+                    "uncertainty_type": "interval",
+                    "fitness_control": "MRS ancestor",
+                    "fitness_control_description": "Synthetic exact-row test control.",
+                }
+            )
+        else:
+            enriched.append(row)
+
+    calibration = derive_calibrated_parameters(enriched, strain="MRS", target_generation=3000)
+
+    assert calibration.fitness_observation_count == 6
+    assert calibration.missing_fitness_observation_count == 0
+    assert calibration.estimates["beta_interference"].provenance == PROVENANCE_FITTED
+    assert calibration.estimates["benefit_scale"].provenance == PROVENANCE_FITTED

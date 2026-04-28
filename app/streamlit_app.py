@@ -12,7 +12,15 @@ if str(SRC) not in sys.path:
 
 import streamlit as st
 
-from mrrm import CalibrationResult, ModelParameters, derive_calibrated_parameters, evaluate_model
+from mrrm import (
+    CalibrationResult,
+    ModelParameters,
+    available_generations,
+    available_strains,
+    derive_calibrated_parameters,
+    evaluate_model,
+    select_calibration_observations,
+)
 from mrrm.data_loaders import (
     DataValidationError,
     build_calibration_inventory,
@@ -32,10 +40,25 @@ def main() -> None:
         "Exploratory deterministic curves only. Outputs are conditional on the "
         "selected assumptions and are not validated biological estimates."
     )
-    calibration = _load_calibration()
+    observations = _load_calibration_observations()
 
     st.sidebar.title("Calibrated from data")
-    if calibration is not None:
+    if observations:
+        strain_options = available_strains(observations)
+        selected_strain = st.sidebar.selectbox("Strain", strain_options, index=0)
+        generations = available_generations(observations, selected_strain)
+        default_generation = max([generation for generation in generations if generation > 0] or generations)
+        target_generation = st.sidebar.number_input(
+            "Generation horizon T",
+            min_value=1.0,
+            value=float(default_generation),
+            step=500.0,
+        )
+        calibration = derive_calibrated_parameters(
+            observations,
+            strain=selected_strain,
+            target_generation=target_generation,
+        )
         st.sidebar.caption(
             "Experimental observations derive supported inputs first; unsupported "
             "inputs remain marked in provenance."
@@ -48,6 +71,8 @@ def main() -> None:
             params = calibration.params
             mode_label = "calibrated from data"
     else:
+        calibration = None
+        selected_strain = None
         st.sidebar.caption(
             "Calibration data could not be loaded, so the app is using fallback "
             "exploratory parameters."
@@ -67,6 +92,12 @@ def main() -> None:
         f"Mode: {mode_label}. Thresholds respond to the model inputs currently "
         "shown in the parameter provenance and sidebar."
     )
+    if calibration is not None:
+        st.caption(
+            f"Calibration driver: strain {calibration.selected_strain}, "
+            f"generation horizon {calibration.target_generation:.0f}; "
+            f"closest experimental generation {calibration.closest_generation}."
+        )
     cols = st.columns(3)
     cols[0].metric("mu_min", _format_optional(estimate.mu_min))
     cols[1].metric("mu_peak", f"{estimate.mu_peak:.3g}x")
@@ -89,7 +120,7 @@ def main() -> None:
 
     if calibration is not None:
         _render_parameter_provenance(calibration)
-    _render_calibration_dataset()
+    _render_calibration_dataset(calibration)
     _render_data_inventory()
 
 
@@ -249,22 +280,23 @@ def _render_data_inventory() -> None:
         st.dataframe(observations, use_container_width=True)
 
 
-def _load_calibration() -> CalibrationResult | None:
+def _load_calibration_observations() -> list[dict] | None:
     try:
-        observations = load_calibration_dataset()
-        return derive_calibrated_parameters(observations)
-    except (DataValidationError, ValueError):
+        return load_calibration_dataset()
+    except DataValidationError:
         return None
 
 
-def _render_calibration_dataset() -> None:
+def _render_calibration_dataset(calibration: CalibrationResult | None = None) -> None:
     st.subheader("Raw experimental observations")
     st.info(
         "calibration_dataset_v0 currently contains real Sprouffske et al. 2018 "
-        "mutation-rate values and confidence intervals only. It does not yet "
-        "contain fitness-vs-control values, mutation-count/genome-decay costs, "
-        "or fitted benefit/decay curves. Therefore it anchors the mutation-rate "
-        "axis, but does not yet answer the main biological question."
+        "mutation-rate values and confidence intervals, plus explicit missing "
+        "fitness/growth slots by strain, replicate, and generation. It does not "
+        "yet contain exact fitness-vs-control values, mutation-count/genome-decay "
+        "costs, or fitted benefit/decay curves. Therefore it anchors the "
+        "mutation-rate axis and prepares the fitness-calibration path, but does "
+        "not yet answer the main biological question."
     )
     st.caption(
         "Next required dataset work: extract exact fitness-vs-control values "
@@ -279,15 +311,31 @@ def _render_calibration_dataset() -> None:
     except DataValidationError as exc:
         st.error(f"Calibration-data validation error: {exc}")
         return
+    selected_observations = (
+        select_calibration_observations(
+            observations,
+            strain=calibration.selected_strain,
+            target_generation=calibration.target_generation,
+        )
+        if calibration is not None
+        else observations
+    )
 
     cols = st.columns(3)
     cols[0].metric("raw observations", inventory["observation_count"])
     cols[1].metric("fitness values", inventory["fitness_observation_count"])
-    cols[2].metric("sources", len(inventory["sources"]))
+    cols[2].metric("missing fitness slots", inventory["missing_fitness_observation_count"])
 
-    st.plotly_chart(make_raw_observation_figure(observations), use_container_width=True)
+    if calibration is not None:
+        st.caption(
+            f"Showing selected calibration rows for strain {calibration.selected_strain} "
+            f"at closest experimental generation {calibration.closest_generation}."
+        )
+    st.plotly_chart(make_raw_observation_figure(selected_observations), use_container_width=True)
 
-    with st.expander("calibration_dataset_v0 rows", expanded=False):
+    with st.expander("selected calibration rows", expanded=False):
+        st.dataframe(selected_observations, use_container_width=True)
+    with st.expander("all calibration_dataset_v0 rows", expanded=False):
         st.dataframe(observations, use_container_width=True)
 
 

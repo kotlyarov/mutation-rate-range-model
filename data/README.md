@@ -45,9 +45,10 @@ used to make model conclusions.
 
 The current `calibration_dataset_v0.csv` file contains raw or directly derived
 experimental observations only. It starts with Sprouffske et al. 2018 S3
-genomic mutation-rate values. Fitness values are not included in v0 because the
-exact raw fitness table has not yet been curated. Any future fitness row must
-name its control.
+genomic mutation-rate values and explicit missing-value slots for matching
+fitness/growth rows. Exact fitness values are not included in v0 because the
+exact raw fitness table has not yet been curated. Any future numeric fitness
+row must name its control.
 
 ## `external/`
 

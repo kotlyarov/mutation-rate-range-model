@@ -133,11 +133,11 @@ Current intended source areas include:
 
 The current data scaffold is **not calibrated model input yet**.
 
-calibration_dataset_v0 currently contains real Sprouffske et al. 2018 mutation-rate values and confidence intervals only. It does not yet contain fitness-vs-control values, mutation-count/genome-decay costs, or fitted benefit/decay curves. Therefore it anchors the mutation-rate axis, but does not yet answer the main biological question.
+calibration_dataset_v0 currently contains real Sprouffske et al. 2018 mutation-rate values and confidence intervals, plus explicit missing-value slots for strain/replicate/generation fitness rows. It does not yet contain exact fitness-vs-control values, mutation-count/genome-decay costs, or fitted benefit/decay curves. Therefore it anchors the mutation-rate axis and prepares the fitness-calibration path, but does not yet answer the main biological question.
 
 Next required dataset work: extract exact fitness-vs-control values from Sprouffske et al. 2018 or its Dryad files if available. If exact numeric values are unavailable, record the value as missing and document whether figure digitisation would be required.
 
-In calibrated mode, the app derives the evaluated mutation-rate range and generation horizon from `calibration_dataset_v0` before computing thresholds. Every model input is displayed with provenance: empirical, fitted, assumed, or unsupported by the current data. Parameters that cannot yet be estimated from exact observations remain marked as unsupported exploratory fallbacks rather than fitted values.
+In calibrated mode, the app derives the evaluated mutation-rate range from the selected strain and closest experimental generation in `calibration_dataset_v0` before computing thresholds. The generation horizon control selects the nearest experimental generation for calibration. Every model input is displayed with provenance: empirical, fitted, assumed, or unsupported by the current data. Parameters that cannot yet be estimated from exact observations remain marked as unsupported exploratory fallbacks rather than fitted values.
 
 Processed observations should preserve source context, including:
 
@@ -158,7 +158,8 @@ Raw data should remain immutable. Processed data should document transformations
 The local GUI allows the user to:
 
 - inspect raw experimental observations before model curves
-- switch between calibrated and exploratory/manual parameter modes
+- enable manual parameter overrides for hypothesis exploration
+- select Sprouffske strain class (`MRS`, `MRM`, `MRL`, `MRXL`)
 - change mutation-rate range
 - change generation horizon
 - change benefit, decay, and robustness parameters
