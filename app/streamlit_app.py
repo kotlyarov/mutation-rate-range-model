@@ -32,7 +32,7 @@ def main() -> None:
         "Exploratory deterministic curves only. Outputs are conditional on the "
         "selected assumptions and are not validated biological estimates."
     )
-    calibration = _render_calibration_dataset()
+    calibration = _load_calibration()
 
     mode = st.sidebar.radio(
         "Parameter mode",
@@ -51,7 +51,6 @@ def main() -> None:
         else:
             params = calibration.params
             mode_label = "calibrated from data"
-        _render_parameter_provenance(calibration)
     else:
         params = _sidebar_parameters(ModelParameters())
         mode_label = "exploratory/manual"
@@ -88,6 +87,9 @@ def main() -> None:
             "D is a scalar decay proxy, not a direct measurement of every harmful mutation."
         )
 
+    if calibration is not None:
+        _render_parameter_provenance(calibration)
+    _render_calibration_dataset()
     _render_data_inventory()
 
 
@@ -247,7 +249,15 @@ def _render_data_inventory() -> None:
         st.dataframe(observations, use_container_width=True)
 
 
-def _render_calibration_dataset() -> CalibrationResult | None:
+def _load_calibration() -> CalibrationResult | None:
+    try:
+        observations = load_calibration_dataset()
+        return derive_calibrated_parameters(observations)
+    except (DataValidationError, ValueError):
+        return None
+
+
+def _render_calibration_dataset() -> None:
     st.subheader("Raw experimental observations")
     st.info(
         "calibration_dataset_v0 currently contains real Sprouffske et al. 2018 "
@@ -266,13 +276,9 @@ def _render_calibration_dataset() -> CalibrationResult | None:
     try:
         observations = load_calibration_dataset()
         inventory = build_calibration_inventory()
-        calibration = derive_calibrated_parameters(observations)
     except DataValidationError as exc:
         st.error(f"Calibration-data validation error: {exc}")
-        return None
-    except ValueError as exc:
-        st.error(f"Calibration error: {exc}")
-        return None
+        return
 
     cols = st.columns(3)
     cols[0].metric("raw observations", inventory["observation_count"])
@@ -283,7 +289,6 @@ def _render_calibration_dataset() -> CalibrationResult | None:
 
     with st.expander("calibration_dataset_v0 rows", expanded=False):
         st.dataframe(observations, use_container_width=True)
-    return calibration
 
 
 def _render_parameter_provenance(calibration: CalibrationResult) -> None:
