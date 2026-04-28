@@ -261,6 +261,7 @@ Start with:
 - [`docs/validation_plan.md`](docs/validation_plan.md)
 - [`reports/first_model_report.md`](reports/first_model_report.md)
 - [`reports/data_inventory.md`](reports/data_inventory.md)
+- [`reports/calibration_audit.md`](reports/calibration_audit.md)
 
 ## Next steps
 

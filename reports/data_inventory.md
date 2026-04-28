@@ -19,7 +19,9 @@ The curated relative-fitness values are computed from Dryad `growth-curves.txt` 
 - `data/raw/sprouffske_2018/phenotyping_data/growth-curves.txt`: extracted raw Dryad growth-curve table used for relative-fitness curation.
 - `data/processed/calibration_dataset_v0.csv`: first real-value processed calibration dataset with mutation-rate and relative-fitness observations.
 - `src/mrrm/data_loaders.py`: low-level loading, normalization, and validation helpers.
+- `src/mrrm/audit.py`: calibration-audit helpers for fit rows, residuals, and leave-one-strain-out checks.
 - `tests/test_data_loaders.py`: validation and loader tests.
+- `reports/calibration_audit.md`: current calibration audit report.
 
 ## Registered Sources
 

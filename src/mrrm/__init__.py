@@ -1,5 +1,11 @@
 """First deterministic version of the Mutation Rate Range Model."""
 
+from .audit import (
+    CalibrationAudit,
+    CalibrationAuditFit,
+    build_calibration_audit,
+    build_calibration_audit_fit,
+)
 from .calibration import (
     CalibrationResult,
     ParameterEstimate,
@@ -23,6 +29,8 @@ from .curves import (
 from .parameters import ModelParameters
 
 __all__ = [
+    "CalibrationAudit",
+    "CalibrationAuditFit",
     "CalibrationResult",
     "ModelParameters",
     "ModelResults",
@@ -31,6 +39,8 @@ __all__ = [
     "adaptive_benefit",
     "available_generations",
     "available_strains",
+    "build_calibration_audit",
+    "build_calibration_audit_fit",
     "closest_observed_generation",
     "decay_proxy",
     "derive_calibrated_parameters",

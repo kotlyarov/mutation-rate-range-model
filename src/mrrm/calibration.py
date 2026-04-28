@@ -488,10 +488,10 @@ def _fit_benefit_parameters(
         raise ValueError("Could not fit benefit parameters from calibration data.")
     _sse, scale, alpha, beta, gamma = best
     return {
-        "benefit_scale": scale,
-        "alpha_benefit": alpha,
-        "beta_interference": beta,
-        "gamma_interference": gamma,
+        "benefit_scale": float(scale),
+        "alpha_benefit": float(alpha),
+        "beta_interference": float(beta),
+        "gamma_interference": float(gamma),
     }
 
 

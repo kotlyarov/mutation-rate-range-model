@@ -17,6 +17,7 @@ from mrrm import (
     ModelParameters,
     available_generations,
     available_strains,
+    build_calibration_audit,
     derive_calibrated_parameters,
     evaluate_model,
     select_calibration_observations,
@@ -63,6 +64,7 @@ def main() -> None:
             "Experimental observations derive supported inputs first; unsupported "
             "inputs remain marked in provenance."
         )
+        show_calibration_audit = st.sidebar.checkbox("Show calibration audit", value=True)
         manual_overrides = st.sidebar.checkbox("Enable manual overrides", value=False)
         if manual_overrides:
             params = _sidebar_parameters(calibration.params)
@@ -73,6 +75,7 @@ def main() -> None:
     else:
         calibration = None
         selected_strain = None
+        show_calibration_audit = False
         st.sidebar.caption(
             "Calibration data could not be loaded, so the app is using fallback "
             "exploratory parameters."
@@ -120,6 +123,8 @@ def main() -> None:
 
     if calibration is not None:
         _render_parameter_provenance(calibration)
+        if show_calibration_audit and observations is not None:
+            _render_calibration_audit(observations, calibration)
     _render_calibration_dataset(calibration)
     _render_data_inventory()
 
@@ -335,6 +340,60 @@ def _render_calibration_dataset(calibration: CalibrationResult | None = None) ->
         st.dataframe(selected_observations, use_container_width=True)
     with st.expander("all calibration_dataset_v0 rows", expanded=False):
         st.dataframe(observations, use_container_width=True)
+
+
+def _render_calibration_audit(
+    observations: list[dict],
+    calibration: CalibrationResult,
+) -> None:
+    st.subheader("Calibration audit")
+    st.caption(
+        "Audit tables separate selected-strain-only fitting from all-strain fitting. "
+        "Rows with negative relative fitness remain in residual tables but are not "
+        "used to fit the current non-negative benefit curve."
+    )
+    audit = build_calibration_audit(
+        observations,
+        selected_strain=calibration.selected_strain,
+        target_generation=calibration.target_generation,
+    )
+
+    selected_tab, all_tab, loo_tab = st.tabs(
+        ["Selected strain", "All strains", "Leave-one-strain-out"]
+    )
+    with selected_tab:
+        _render_audit_fit(audit.selected_strain_fit)
+    with all_tab:
+        _render_audit_fit(audit.all_strain_fit)
+    with loo_tab:
+        st.caption(
+            "Each row trains on all other strains and evaluates residuals on the "
+            "held-out strain's exact relative-fitness observations."
+        )
+        st.dataframe(audit.leave_one_strain_out, use_container_width=True)
+
+
+def _render_audit_fit(audit_fit) -> None:
+    st.markdown(f"**{audit_fit.label}**")
+    cols = st.columns(4)
+    cols[0].metric("selected rows", len(audit_fit.selected_rows))
+    cols[1].metric("observed fitness rows", len(audit_fit.observed_rows))
+    cols[2].metric("fit rows", len(audit_fit.fit_rows))
+    cols[3].metric("excluded rows", len(audit_fit.excluded_rows))
+
+    st.caption("Objective/loss on rows used for benefit fitting.")
+    st.write(audit_fit.objective)
+    st.caption("Threshold estimate from this calibration scope.")
+    st.write(audit_fit.threshold_estimate)
+
+    with st.expander("Rows used for fitting", expanded=True):
+        st.dataframe(audit_fit.fit_rows, use_container_width=True)
+    with st.expander("Fitted benefit/interference parameters", expanded=True):
+        st.dataframe(audit_fit.fitted_parameters, use_container_width=True)
+    with st.expander("Predicted vs observed fitness and residuals", expanded=True):
+        st.dataframe(audit_fit.predictions, use_container_width=True)
+    with st.expander("Observed rows excluded from benefit fitting", expanded=False):
+        st.dataframe(audit_fit.excluded_rows, use_container_width=True)
 
 
 def _render_parameter_provenance(calibration: CalibrationResult) -> None:
