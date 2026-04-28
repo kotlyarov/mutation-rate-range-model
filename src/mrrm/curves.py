@@ -342,19 +342,26 @@ def estimate_range(
 
     max_benefit = float(np.max(benefit_values))
     benefit_threshold = params.benefit_threshold_fraction * max_benefit
-    benefit_mask = benefit_values >= benefit_threshold
-    mu_min = float(m_values[np.flatnonzero(benefit_mask)[0]]) if np.any(benefit_mask) else None
-
-    max_decay = float(np.max(decay_values))
-    decay_threshold = params.decay_threshold_fraction * max_decay
     max_score = float(np.max(score_values))
     net_threshold = (
         params.net_threshold_fraction * max_score
         if max_score > 0
         else max_score
     )
-    range_mask = (score_values >= net_threshold) & (decay_values <= decay_threshold)
-    mu_max = float(m_values[np.flatnonzero(range_mask)[-1]]) if np.any(range_mask) else None
+    max_decay = float(np.max(decay_values))
+    decay_threshold = max(
+        params.decay_threshold_fraction * max_decay,
+        float(decay_values[peak_index]),
+    )
+
+    lower_mask = (benefit_values >= benefit_threshold) & (score_values >= net_threshold)
+    upper_mask = (score_values >= net_threshold) & (decay_values <= decay_threshold)
+    lower_mask[peak_index] = True
+    upper_mask[peak_index] = True
+    left_index = _left_bound_around_peak(lower_mask, peak_index)
+    right_index = _right_bound_around_peak(upper_mask, peak_index)
+    mu_min = float(m_values[left_index])
+    mu_max = float(m_values[right_index])
 
     return RangeEstimate(
         mu_min=mu_min,
@@ -392,27 +399,31 @@ def evaluate_model(params: ModelParameters | None = None) -> ModelResults:
         score_values,
         params,
     )
+    chart_benefit_values = survival_values.post_selection_benefit
+    chart_decay_values = survival_values.post_selection_decay
+    chart_robustness_values = survival_values.post_selection_robustness
+    chart_score_values = survival_values.post_selection_score
     validate_curve_outputs(
         m_values,
-        survival_values.post_selection_benefit,
-        survival_values.post_selection_decay,
-        survival_values.post_selection_robustness,
-        survival_values.post_selection_score,
+        chart_benefit_values,
+        chart_decay_values,
+        chart_robustness_values,
+        chart_score_values,
     )
     range_estimate = estimate_range(
         m_values,
-        survival_values.post_selection_benefit,
-        survival_values.post_selection_decay,
-        survival_values.post_selection_robustness,
-        survival_values.post_selection_score,
+        chart_benefit_values,
+        chart_decay_values,
+        chart_robustness_values,
+        chart_score_values,
         params,
     )
     return ModelResults(
         m_values=m_values,
-        benefit=survival_values.post_selection_benefit,
-        decay=survival_values.post_selection_decay,
-        robustness=survival_values.post_selection_robustness,
-        score=survival_values.post_selection_score,
+        benefit=chart_benefit_values,
+        decay=chart_decay_values,
+        robustness=chart_robustness_values,
+        score=chart_score_values,
         survival_selection=survival_values,
         range_estimate=range_estimate,
     )
@@ -471,6 +482,26 @@ def _generation_count(params: ModelParameters) -> int:
 def _normalize_probability(values: np.ndarray) -> np.ndarray:
     values = np.maximum(values, MIN_SURVIVAL_PROBABILITY)
     return values / np.sum(values)
+
+
+def _left_bound_around_peak(
+    mask: np.ndarray,
+    peak_index: int,
+) -> int:
+    left_index = peak_index
+    while left_index > 0 and bool(mask[left_index - 1]):
+        left_index -= 1
+    return left_index
+
+
+def _right_bound_around_peak(
+    mask: np.ndarray,
+    peak_index: int,
+) -> int:
+    right_index = peak_index
+    while right_index < mask.size - 1 and bool(mask[right_index + 1]):
+        right_index += 1
+    return right_index
 
 
 def _relative_fitness_from_score(

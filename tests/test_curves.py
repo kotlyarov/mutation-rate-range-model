@@ -62,6 +62,28 @@ def test_estimate_range_returns_evaluated_peak():
     assert estimate.mu_peak in results.m_values
     assert estimate.mu_min is None or params.m_min <= estimate.mu_min <= params.m_max
     assert estimate.mu_max is None or params.m_min <= estimate.mu_max <= params.m_max
+    assert estimate.mu_min <= estimate.mu_peak <= estimate.mu_max
+
+
+def test_estimate_range_uses_contiguous_chart_region_around_peak():
+    params = ModelParameters(
+        T=100,
+        T_ref=100,
+        n_points=6,
+        net_threshold_fraction=0.8,
+        decay_threshold_fraction=1.0,
+    )
+    m_values = np.asarray([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
+    benefit = np.asarray([0.1, 0.2, 1.0, 0.9, 0.1, 0.95])
+    decay = np.zeros_like(m_values)
+    retained = np.ones_like(m_values)
+    score = np.asarray([0.1, 0.2, 1.0, 0.9, 0.1, 0.95])
+
+    estimate = estimate_range(m_values, benefit, decay, retained, score, params)
+
+    assert estimate.mu_min == 0.3
+    assert estimate.mu_peak == 0.3
+    assert estimate.mu_max == 0.4
 
 
 def test_disabled_survival_selection_keeps_threshold_inputs_unchanged():

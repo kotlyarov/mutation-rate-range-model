@@ -212,8 +212,8 @@ The model should estimate:
 
 ```text
 mu_peak = m where the threshold score landscape is maximal
-mu_min = lowest m that reaches a threshold fraction of peak benefit
-mu_max = highest m before net score or decay threshold becomes unacceptable
+mu_min = lower edge of the contiguous acceptable chart region containing mu_peak
+mu_max = upper edge of the contiguous acceptable chart region containing mu_peak
 ```
 
 Suggested default rules:
@@ -227,16 +227,28 @@ net_threshold_fraction = 0.80
 Possible definitions:
 
 ```text
-mu_min = lowest m where B_threshold(m, T) >= benefit_threshold_fraction * max(B_threshold)
-
 mu_peak = m at max(S_threshold)
 
-mu_max = highest m where:
+lower_acceptable(m) is true where:
+  B_threshold(m, T) >= benefit_threshold_fraction * max(B_threshold)
+  and S_threshold(m, T) >= net_threshold_fraction * max(S_threshold)
+
+upper_acceptable(m) is true where:
   S_threshold(m, T) >= net_threshold_fraction * max(S_threshold)
-  and D_threshold(m, T) <= decay_threshold_fraction * max(D_threshold)
+  and D_threshold(m, T) <= max(
+    decay_threshold_fraction * max(D_threshold),
+    D_threshold(mu_peak)
+  )
+
+mu_min = lowest m in the contiguous lower_acceptable region ending at mu_peak
+mu_max = highest m in the contiguous upper_acceptable region starting at mu_peak
 ```
 
-These rules must be configurable and clearly labelled.
+These rules must be configurable and clearly labelled. `mu_min`, `mu_peak`, and
+`mu_max` must be calculated from the same `B_threshold`, `D_threshold`, and
+`S_threshold` arrays plotted in the chart. The peak must always lie inside the
+reported interval, and disconnected acceptable regions away from the plotted
+peak must not extend the reported range.
 
 When Survival Selection is disabled:
 
