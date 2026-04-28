@@ -34,12 +34,8 @@ def main() -> None:
     )
     calibration = _load_calibration()
 
-    mode = st.sidebar.radio(
-        "Parameter mode",
-        ["Calibrated from data", "Exploratory/manual"],
-        index=0,
-    )
-    if mode == "Calibrated from data" and calibration is not None:
+    st.sidebar.title("Calibrated from data")
+    if calibration is not None:
         st.sidebar.caption(
             "Experimental observations derive supported inputs first; unsupported "
             "inputs remain marked in provenance."
@@ -52,8 +48,12 @@ def main() -> None:
             params = calibration.params
             mode_label = "calibrated from data"
     else:
+        st.sidebar.caption(
+            "Calibration data could not be loaded, so the app is using fallback "
+            "exploratory parameters."
+        )
         params = _sidebar_parameters(ModelParameters())
-        mode_label = "exploratory/manual"
+        mode_label = "fallback exploratory parameters"
 
     try:
         results = evaluate_model(params)
