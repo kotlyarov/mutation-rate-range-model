@@ -50,6 +50,42 @@ Project relevance:
 - provides theoretical background for mutation-rate evolution in rapidly adapting asexual populations
 - motivates caution around clonal interference, linkage, and population-genetic context
 
+### Ascensao et al. 2026
+
+Ascensao, J. A., Yu, Q., et al. (2026). *The evolution of genetic drift over
+50,000 generations*. bioRxiv preprint.
+
+DOI:
+
+```text
+10.64898/2026.01.25.701616
+```
+
+Project relevance:
+
+- provides the closest experimental proxy found for the first
+  `survival_stochasticity` default
+- estimates LTEE descendant-number variance and reports the ancestor near 1.3,
+  with bottleneck-only stochasticity near 1
+
+### Human Population Genetics and Genomics selection chapter
+
+Pritchard Lab. *Natural selection: background and models*. Human Population
+Genetics and Genomics, chapter 2.5.
+
+URL:
+
+```text
+https://web.stanford.edu/group/pritchardlab/HGbook/Release-2023-09/HGBook-2023-09-chapters/HGBook-2023-09-23-ch2.5.pdf
+```
+
+Project relevance:
+
+- motivates the simple soft-selection assumption that post-selection
+  frequencies are proportional to pre-selection frequency times relative fitness
+- motivates keeping deterministic expectations separate from random drift or
+  Wright-Fisher sampling
+
 ## LTEE resources
 
 ### Long-Term Evolution Experiment website

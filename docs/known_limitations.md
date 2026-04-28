@@ -36,9 +36,10 @@ It may combine several distinct biological processes:
 
 These should not be treated as identical in scientific interpretation.
 
-## No explicit population genetics in version one
+## Minimal population genetics only
 
-The first version does not explicitly model:
+The first version includes only a minimal expected Survival Selection block. It
+does not explicitly model:
 
 - individual organisms
 - genetic drift
@@ -49,7 +50,20 @@ The first version does not explicitly model:
 - lineage structure
 - extinction risk
 
-Some of these effects may be approximated indirectly by parameters, but they are not simulated.
+Some of these effects may be approximated indirectly by parameters, but they are
+not simulated. The survival layer is a deterministic soft-selection expectation,
+not a Wright-Fisher or Moran simulation.
+
+## Survival Selection is not an experimental-process model
+
+`population_growth_factor` changes effective selection pressure only. It is not a
+nutrient, dilution, transfer, resource, or culture-volume submodel.
+
+`survival_stochasticity` mixes fitness-weighted survival with neutral expected
+survival. It does not draw random survivors or estimate uncertainty.
+
+The `0.23` default is an experimentally motivated proxy from descendant-number
+variance, not a proven universal survival-stochasticity value.
 
 ## No real-data fitting yet
 

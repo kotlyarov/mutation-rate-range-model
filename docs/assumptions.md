@@ -11,6 +11,8 @@ The first model assumes:
 - selected-environment fitness and genome integrity can be represented separately
 - model outputs are approximate curves, not exact biological measurements
 - results are conditional on parameter choices
+- Survival Selection, when enabled, is an expected survival filter rather than a
+  full population-genetic simulation
 
 ## Biological assumptions
 
@@ -80,6 +82,30 @@ S(m, T) = B(m, T) - lambda_decay * D(m, T) + rho_robustness * R(m, T)
 
 It is useful for comparing assumptions, not for declaring a biological law.
 
+### Survival Selection
+
+The optional Survival Selection block assumes that mutation-rate classes with
+higher net scores contribute more to the next threshold landscape under
+replacement competition.
+
+The first implementation uses expected fitness-weighted survival probabilities.
+It does not create explicit organisms, lineages, transfers, nutrient dynamics, or
+experimental bottleneck protocols.
+
+`population_growth_factor` is only a pressure modifier:
+
+- values above 1 weaken selection by increasing the effective growth buffer
+- values below 1 strengthen selection by representing tighter replacement
+  competition
+
+`survival_stochasticity` is implemented as deterministic neutral mixing in the
+expected survival probabilities. It represents probabilistic survival noise
+without sampling a random next generation.
+
+The default value, `0.23`, is not a direct fitted survival parameter. It maps
+the closest experimental drift proxy found, LTEE ancestor descendant-number
+variance around 1.3, to excess stochasticity `(1.3 - 1) / 1.3`.
+
 ## Modelling assumptions
 
 ### Deterministic curves first
@@ -87,6 +113,8 @@ It is useful for comparing assumptions, not for declaring a biological law.
 The first version does not simulate individuals, lineages, fixation, drift, or clonal interference directly.
 
 Instead, these effects are represented indirectly through curve shapes and parameters.
+Survival Selection adds a minimal viability-selection expectation, but it still
+does not model realized genetic drift or fixation.
 
 ### Log-spaced mutation-rate range
 

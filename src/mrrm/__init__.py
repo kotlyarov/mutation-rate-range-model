@@ -18,6 +18,7 @@ from .calibration import (
 from .curves import (
     ModelResults,
     RangeEstimate,
+    SurvivalSelectionResult,
     adaptive_benefit,
     decay_proxy,
     estimate_range,
@@ -25,6 +26,7 @@ from .curves import (
     make_m_values,
     net_score,
     robustness,
+    survival_selection,
 )
 from .parameters import ModelParameters
 
@@ -36,6 +38,7 @@ __all__ = [
     "ModelResults",
     "ParameterEstimate",
     "RangeEstimate",
+    "SurvivalSelectionResult",
     "adaptive_benefit",
     "available_generations",
     "available_strains",
@@ -50,4 +53,5 @@ __all__ = [
     "net_score",
     "robustness",
     "select_calibration_observations",
+    "survival_selection",
 ]

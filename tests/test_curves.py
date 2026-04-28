@@ -9,6 +9,7 @@ from mrrm import (
     make_m_values,
     net_score,
     robustness,
+    survival_selection,
 )
 
 
@@ -57,3 +58,126 @@ def test_estimate_range_returns_evaluated_peak():
     assert estimate.mu_peak in results.m_values
     assert estimate.mu_min is None or params.m_min <= estimate.mu_min <= params.m_max
     assert estimate.mu_max is None or params.m_min <= estimate.mu_max <= params.m_max
+
+
+def test_disabled_survival_selection_keeps_threshold_inputs_unchanged():
+    params = ModelParameters(
+        n_points=80,
+        survival_selection_enabled=False,
+        population_growth_factor=0.5,
+        selection_strength=4.0,
+        survival_stochasticity=0.5,
+    )
+    results = evaluate_model(params)
+    survival = results.survival_selection
+
+    assert survival.enabled is False
+    assert np.allclose(survival.contribution_weight, 1.0)
+    assert np.allclose(survival.post_selection_benefit, results.benefit)
+    assert np.allclose(survival.post_selection_decay, results.decay)
+    assert np.allclose(survival.post_selection_score, results.score)
+
+
+def test_survival_selection_probabilities_are_finite_and_normalized():
+    params = ModelParameters(n_points=80, survival_selection_enabled=True)
+    results = evaluate_model(params)
+    survival = survival_selection(
+        results.benefit,
+        results.decay,
+        results.robustness,
+        results.score,
+        params,
+    )
+
+    assert survival.enabled is True
+    assert survival.survival_probability.shape == results.m_values.shape
+    assert np.all(np.isfinite(survival.survival_probability))
+    assert np.all(survival.survival_probability > 0)
+    assert np.isclose(np.sum(survival.survival_probability), 1.0)
+    assert np.all(np.isfinite(survival.contribution_weight))
+
+
+def test_stronger_selection_reduces_high_decay_low_fitness_contribution():
+    weak = evaluate_model(
+        ModelParameters(
+            n_points=120,
+            survival_selection_enabled=True,
+            selection_strength=0.05,
+        )
+    )
+    strong = evaluate_model(
+        ModelParameters(
+            n_points=120,
+            survival_selection_enabled=True,
+            selection_strength=2.0,
+        )
+    )
+
+    assert (
+        strong.survival_selection.contribution_weight[-1]
+        < weak.survival_selection.contribution_weight[-1]
+    )
+    assert (
+        strong.survival_selection.post_selection_decay[-1]
+        < weak.survival_selection.post_selection_decay[-1]
+    )
+
+
+def test_enabled_survival_selection_feeds_threshold_estimation():
+    params = ModelParameters(
+        n_points=120,
+        survival_selection_enabled=True,
+        selection_strength=2.0,
+        survival_stochasticity=0.0,
+    )
+    results = evaluate_model(params)
+    raw_estimate = estimate_range(
+        results.m_values,
+        results.benefit,
+        results.decay,
+        results.robustness,
+        results.score,
+        params,
+    )
+
+    assert results.range_estimate.mu_max != raw_estimate.mu_max
+    assert results.range_estimate.decay_threshold != raw_estimate.decay_threshold
+
+
+def test_population_growth_factor_weakens_or_strengthens_selection_pressure():
+    bottleneck = evaluate_model(
+        ModelParameters(
+            n_points=120,
+            survival_selection_enabled=True,
+            population_growth_factor=0.5,
+        )
+    )
+    growth = evaluate_model(
+        ModelParameters(
+            n_points=120,
+            survival_selection_enabled=True,
+            population_growth_factor=2.0,
+        )
+    )
+
+    assert (
+        bottleneck.survival_selection.effective_selection_strength
+        > growth.survival_selection.effective_selection_strength
+    )
+    assert (
+        bottleneck.survival_selection.contribution_weight[-1]
+        < growth.survival_selection.contribution_weight[-1]
+    )
+
+
+def test_full_survival_stochasticity_returns_neutral_survival_weights():
+    results = evaluate_model(
+        ModelParameters(
+            n_points=80,
+            survival_selection_enabled=True,
+            survival_stochasticity=1.0,
+        )
+    )
+
+    assert np.allclose(results.survival_selection.contribution_weight, 1.0)
+    assert np.allclose(results.survival_selection.post_selection_score, results.score)

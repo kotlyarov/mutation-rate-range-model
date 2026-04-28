@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+DEFAULT_SURVIVAL_STOCHASTICITY = 0.23
+
 
 @dataclass(frozen=True)
 class ModelParameters:
@@ -32,6 +34,11 @@ class ModelParameters:
 
     lambda_decay: float = 0.2
     rho_robustness: float = 0.1
+
+    survival_selection_enabled: bool = True
+    population_growth_factor: float = 1.0
+    selection_strength: float = 1.0
+    survival_stochasticity: float = DEFAULT_SURVIVAL_STOCHASTICITY
 
     benefit_threshold_fraction: float = 0.80
     net_threshold_fraction: float = 0.80

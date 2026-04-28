@@ -64,8 +64,8 @@ def main() -> None:
             "Experimental observations derive supported inputs first; unsupported "
             "inputs remain marked in provenance."
         )
-        show_calibration_audit = st.sidebar.checkbox("Show calibration audit", value=True)
         manual_overrides = st.sidebar.checkbox("Enable manual overrides", value=False)
+        show_calibration_audit = st.sidebar.checkbox("Show calibration audit", value=False)
         if manual_overrides:
             params = _sidebar_parameters(calibration.params)
             mode_label = "calibrated base with manual overrides"
@@ -95,6 +95,16 @@ def main() -> None:
         f"Mode: {mode_label}. Thresholds respond to the model inputs currently "
         "shown in the parameter provenance and sidebar."
     )
+    if params.survival_selection_enabled:
+        st.caption(
+            "Survival Selection is enabled, so thresholds use the expected "
+            "post-selection landscape rather than all generated lineages."
+        )
+    else:
+        st.caption(
+            "Survival Selection is disabled, so thresholds use the raw "
+            "deterministic landscape."
+        )
     if calibration is not None:
         st.caption(
             f"Calibration driver: strain {calibration.selected_strain}, "
@@ -115,6 +125,16 @@ def main() -> None:
                 "net_threshold": estimate.net_threshold,
                 "decay_threshold": estimate.decay_threshold,
                 "peak_score": estimate.peak_score,
+                "survival_selection_enabled": results.survival_selection.enabled,
+                "effective_selection_strength": (
+                    results.survival_selection.effective_selection_strength
+                ),
+                "maximum_survival_contribution": float(
+                    results.survival_selection.contribution_weight.max()
+                ),
+                "minimum_survival_contribution": float(
+                    results.survival_selection.contribution_weight.min()
+                ),
             }
         )
         st.caption(
@@ -208,6 +228,31 @@ def _sidebar_parameters(defaults: ModelParameters | None = None) -> ModelParamet
             format="%.6g",
         )
 
+    with st.sidebar.expander("Survival Selection", expanded=False):
+        survival_selection_enabled = st.checkbox(
+            "Enable Survival Selection",
+            value=defaults.survival_selection_enabled,
+        )
+        population_growth_factor = st.number_input(
+            "population_growth_factor",
+            min_value=1e-6,
+            value=float(defaults.population_growth_factor),
+            format="%.6g",
+        )
+        selection_strength = st.number_input(
+            "selection_strength",
+            min_value=0.0,
+            value=float(defaults.selection_strength),
+            format="%.6g",
+        )
+        survival_stochasticity = st.slider(
+            "survival_stochasticity",
+            min_value=0.0,
+            max_value=1.0,
+            value=float(defaults.survival_stochasticity),
+            step=0.05,
+        )
+
     with st.sidebar.expander("Threshold rules", expanded=False):
         benefit_threshold_fraction = st.slider(
             "benefit_threshold_fraction",
@@ -246,6 +291,10 @@ def _sidebar_parameters(defaults: ModelParameters | None = None) -> ModelParamet
         k_robustness=k_robustness,
         lambda_decay=lambda_decay,
         rho_robustness=rho_robustness,
+        survival_selection_enabled=survival_selection_enabled,
+        population_growth_factor=population_growth_factor,
+        selection_strength=selection_strength,
+        survival_stochasticity=survival_stochasticity,
         benefit_threshold_fraction=benefit_threshold_fraction,
         net_threshold_fraction=net_threshold_fraction,
         decay_threshold_fraction=decay_threshold_fraction,

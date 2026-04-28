@@ -140,6 +140,22 @@ def make_curve_figure(results: ModelResults) -> go.Figure:
         mode="lines",
         name="S: net score",
     )
+    if results.survival_selection.enabled:
+        fig.add_scatter(
+            x=results.m_values,
+            y=results.survival_selection.post_selection_score,
+            mode="lines",
+            name="S after survival filtering",
+            line={"dash": "dash"},
+        )
+        fig.add_scatter(
+            x=results.m_values,
+            y=results.survival_selection.contribution_weight,
+            mode="lines",
+            name="survival contribution",
+            yaxis="y2",
+            line={"dash": "dot"},
+        )
 
     estimate = results.range_estimate
     _add_marker(fig, estimate.mu_min, "mu_min")
@@ -151,6 +167,13 @@ def make_curve_figure(results: ModelResults) -> go.Figure:
         xaxis_title="Mutation-rate multiplier relative to wild type",
         yaxis_title="Relative model units",
         xaxis_type="log",
+        yaxis2={
+            "title": "Survival contribution",
+            "overlaying": "y",
+            "side": "right",
+            "showgrid": False,
+            "visible": results.survival_selection.enabled,
+        },
         legend_title="Curve",
         template="plotly_white",
         margin={"l": 48, "r": 24, "t": 56, "b": 48},

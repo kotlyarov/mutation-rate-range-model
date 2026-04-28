@@ -26,6 +26,12 @@ BENEFIT_PARAMETER_NAMES = {
 DECAY_PARAMETER_NAMES = {"decay_scale", "gamma_decay"}
 ROBUSTNESS_PARAMETER_NAMES = {"k_robustness"}
 WEIGHT_PARAMETER_NAMES = {"lambda_decay", "rho_robustness"}
+SURVIVAL_SELECTION_PARAMETER_NAMES = {
+    "survival_selection_enabled",
+    "population_growth_factor",
+    "selection_strength",
+    "survival_stochasticity",
+}
 THRESHOLD_PARAMETER_NAMES = {
     "benefit_threshold_fraction",
     "net_threshold_fraction",
@@ -390,6 +396,12 @@ def _fallback_provenance(name: str) -> tuple[str, str, str]:
             PROVENANCE_ASSUMED,
             "exploratory utility weighting",
             "Retained manual weight because current data do not identify this trade-off weight.",
+        )
+    if name in SURVIVAL_SELECTION_PARAMETER_NAMES:
+        return (
+            PROVENANCE_ASSUMED,
+            "exploratory survival-selection setting",
+            "Retained manual survival-filter setting; current data do not identify survival selection.",
         )
     if name in BENEFIT_PARAMETER_NAMES:
         return (

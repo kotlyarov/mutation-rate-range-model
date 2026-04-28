@@ -58,6 +58,32 @@ def validate_parameters(params: Any) -> None:
     _require_nonnegative("lambda_decay", params.lambda_decay)
     _require_nonnegative("rho_robustness", params.rho_robustness)
 
+    if not isinstance(params.survival_selection_enabled, bool):
+        raise ParameterValidationError(
+            "survival_selection_enabled must be true or false."
+        )
+    population_growth_factor = _require_positive(
+        "population_growth_factor",
+        params.population_growth_factor,
+    )
+    selection_strength = _require_nonnegative(
+        "selection_strength",
+        params.selection_strength,
+    )
+    _require_fraction("survival_stochasticity", params.survival_stochasticity)
+    effective_selection_strength = selection_strength / population_growth_factor
+    if (
+        params.survival_selection_enabled
+        and (
+            not math.isfinite(effective_selection_strength)
+            or effective_selection_strength > MAX_SAFE_LOG
+        )
+    ):
+        raise ParameterValidationError(
+            "effective selection strength would exceed numerical stability limits; "
+            "increase population_growth_factor or reduce selection_strength."
+        )
+
     _require_fraction("benefit_threshold_fraction", params.benefit_threshold_fraction)
     _require_fraction("net_threshold_fraction", params.net_threshold_fraction)
     _require_fraction("decay_threshold_fraction", params.decay_threshold_fraction)
