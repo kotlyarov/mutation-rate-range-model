@@ -137,6 +137,8 @@ calibration_dataset_v0 currently contains real Sprouffske et al. 2018 mutation-r
 
 Next required dataset work: extract exact fitness-vs-control values from Sprouffske et al. 2018 or its Dryad files if available. If exact numeric values are unavailable, record the value as missing and document whether figure digitisation would be required.
 
+In calibrated mode, the app derives the evaluated mutation-rate range and generation horizon from `calibration_dataset_v0` before computing thresholds. Every model input is displayed with provenance: empirical, fitted, assumed, or unsupported by the current data. Parameters that cannot yet be estimated from exact observations remain marked as unsupported exploratory fallbacks rather than fitted values.
+
 Processed observations should preserve source context, including:
 
 - source or paper
@@ -155,14 +157,16 @@ Raw data should remain immutable. Processed data should document transformations
 
 The local GUI allows the user to:
 
+- inspect raw experimental observations before model curves
+- switch between calibrated and exploratory/manual parameter modes
 - change mutation-rate range
 - change generation horizon
 - change benefit, decay, and robustness parameters
 - observe benefit, decay, robustness, and net-score curves
 - inspect whether curve behaviour looks biologically plausible
-- view the experimental-data inventory scaffold
+- view model-input provenance and the experimental-data inventory scaffold
 
-The experimental-data section should be read as schema/data-pipeline inspection only until curated numeric datasets are added.
+The experimental-data section should be read with the provenance table. Current calibrated thresholds are sensitive to the empirical mutation-rate axis, but unsupported benefit and decay terms still depend on exploratory fallback values until exact observations are curated.
 
 ## Repository structure
 

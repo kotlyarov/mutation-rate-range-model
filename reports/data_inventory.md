@@ -63,6 +63,8 @@ Not included:
 
 No figure values were digitized. Missing fitness data are left absent rather than guessed.
 
+In calibrated mode, `calibration_dataset_v0` currently supplies empirical values for the evaluated mutation-rate range and generation horizon. It does not supply fitted benefit, interference, decay, robustness, or utility-weight parameters. Those inputs are therefore displayed as assumed or unsupported exploratory fallbacks in the app provenance table.
+
 ## Validation Checks
 
 The loader currently checks:

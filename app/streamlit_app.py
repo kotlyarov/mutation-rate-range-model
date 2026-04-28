@@ -12,7 +12,7 @@ if str(SRC) not in sys.path:
 
 import streamlit as st
 
-from mrrm import ModelParameters, evaluate_model
+from mrrm import CalibrationResult, ModelParameters, derive_calibrated_parameters, evaluate_model
 from mrrm.data_loaders import (
     DataValidationError,
     build_calibration_inventory,
@@ -32,9 +32,30 @@ def main() -> None:
         "Exploratory deterministic curves only. Outputs are conditional on the "
         "selected assumptions and are not validated biological estimates."
     )
-    _render_calibration_dataset()
+    calibration = _render_calibration_dataset()
 
-    params = _sidebar_parameters()
+    mode = st.sidebar.radio(
+        "Parameter mode",
+        ["Calibrated from data", "Exploratory/manual"],
+        index=0,
+    )
+    if mode == "Calibrated from data" and calibration is not None:
+        st.sidebar.caption(
+            "Experimental observations derive supported inputs first; unsupported "
+            "inputs remain marked in provenance."
+        )
+        manual_overrides = st.sidebar.checkbox("Enable manual overrides", value=False)
+        if manual_overrides:
+            params = _sidebar_parameters(calibration.params)
+            mode_label = "calibrated base with manual overrides"
+        else:
+            params = calibration.params
+            mode_label = "calibrated from data"
+        _render_parameter_provenance(calibration)
+    else:
+        params = _sidebar_parameters(ModelParameters())
+        mode_label = "exploratory/manual"
+
     try:
         results = evaluate_model(params)
     except (ParameterValidationError, ValueError) as exc:
@@ -44,8 +65,8 @@ def main() -> None:
     estimate = results.range_estimate
     st.subheader("Threshold estimates")
     st.caption(
-        "Under the selected assumptions, the model estimates approximate "
-        "threshold-based mutation-rate multipliers."
+        f"Mode: {mode_label}. Thresholds respond to the model inputs currently "
+        "shown in the parameter provenance and sidebar."
     )
     cols = st.columns(3)
     cols[0].metric("mu_min", _format_optional(estimate.mu_min))
@@ -70,8 +91,8 @@ def main() -> None:
     _render_data_inventory()
 
 
-def _sidebar_parameters() -> ModelParameters:
-    defaults = ModelParameters()
+def _sidebar_parameters(defaults: ModelParameters | None = None) -> ModelParameters:
+    defaults = defaults or ModelParameters()
     st.sidebar.header("Model inputs")
 
     T = st.sidebar.number_input(
@@ -226,7 +247,7 @@ def _render_data_inventory() -> None:
         st.dataframe(observations, use_container_width=True)
 
 
-def _render_calibration_dataset() -> None:
+def _render_calibration_dataset() -> CalibrationResult | None:
     st.subheader("Raw experimental observations")
     st.info(
         "calibration_dataset_v0 currently contains real Sprouffske et al. 2018 "
@@ -245,9 +266,13 @@ def _render_calibration_dataset() -> None:
     try:
         observations = load_calibration_dataset()
         inventory = build_calibration_inventory()
+        calibration = derive_calibrated_parameters(observations)
     except DataValidationError as exc:
         st.error(f"Calibration-data validation error: {exc}")
-        return
+        return None
+    except ValueError as exc:
+        st.error(f"Calibration error: {exc}")
+        return None
 
     cols = st.columns(3)
     cols[0].metric("raw observations", inventory["observation_count"])
@@ -258,6 +283,17 @@ def _render_calibration_dataset() -> None:
 
     with st.expander("calibration_dataset_v0 rows", expanded=False):
         st.dataframe(observations, use_container_width=True)
+    return calibration
+
+
+def _render_parameter_provenance(calibration: CalibrationResult) -> None:
+    st.subheader("Model input provenance")
+    st.caption(
+        "Every model input is classified as empirical, fitted, assumed, or "
+        "unsupported by the current data. Unsupported values remain exploratory "
+        "fallbacks until exact observations are curated."
+    )
+    st.dataframe(calibration.provenance_rows(), use_container_width=True)
 
 
 if __name__ == "__main__":

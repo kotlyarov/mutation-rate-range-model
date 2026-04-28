@@ -115,9 +115,9 @@ REQUIRED_CALIBRATION_VALUES = (
 
 CALIBRATION_NUMERIC_FIELDS = {
     "generation": "nonnegative_integer",
-    "measurement_value": "nonnegative_float",
-    "measurement_lower": "nonnegative_float",
-    "measurement_upper": "nonnegative_float",
+    "measurement_value": "finite_float",
+    "measurement_lower": "finite_float",
+    "measurement_upper": "finite_float",
     "mutation_rate_multiplier": "positive_float",
     "mutation_rate_multiplier_lower": "positive_float",
     "mutation_rate_multiplier_upper": "positive_float",
@@ -358,6 +358,8 @@ def _parse_optional_number(
         if parsed < 0:
             raise DataValidationError(f"{path}:{line_number} {field} must be non-negative.")
         return parsed
+    if rule == "finite_float":
+        return parsed
     if rule == "unit_interval":
         if parsed < 0 or parsed > 1:
             raise DataValidationError(f"{path}:{line_number} {field} must be between 0 and 1.")
@@ -439,6 +441,7 @@ def _normalize_calibration_row(
         path,
         line_number,
     )
+    _validate_measurement_domain(normalized, path, line_number)
     _validate_fitness_control(normalized, path, line_number)
     return normalized
 
@@ -501,6 +504,17 @@ def _validate_fitness_control(row: dict[str, Any], path: Path, line_number: int)
         raise DataValidationError(
             f"{path}:{line_number} every fitness value must name its control."
         )
+
+
+def _validate_measurement_domain(row: dict[str, Any], path: Path, line_number: int) -> None:
+    measurement_kind = row["measurement_kind"]
+    if measurement_kind in {"genomic_mutation_rate_U", "mutation_count", "genome_decay_proxy"}:
+        for field in ("measurement_value", "measurement_lower", "measurement_upper"):
+            value = row[field]
+            if value is not None and value < 0:
+                raise DataValidationError(
+                    f"{path}:{line_number} {measurement_kind} requires non-negative {field}."
+                )
 
 
 def _validate_unique_ids(rows: list[dict[str, Any]], id_field: str, label: str) -> None:
