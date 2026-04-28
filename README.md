@@ -131,11 +131,11 @@ Current intended source areas include:
 - Couce et al. 2017
 - Maddamsetti et al. 2020
 
-The current data scaffold is **not calibrated model input yet**.
+The current data scaffold is **raw experimental input for calibration, not a validated biological conclusion**.
 
-calibration_dataset_v0 currently contains real Sprouffske et al. 2018 mutation-rate values and confidence intervals, plus explicit missing-value slots for strain/replicate/generation fitness rows. It does not yet contain exact fitness-vs-control values, mutation-count/genome-decay costs, or fitted benefit/decay curves. Therefore it anchors the mutation-rate axis and prepares the fitness-calibration path, but does not yet answer the main biological question.
+calibration_dataset_v0 currently contains real Sprouffske et al. 2018 mutation-rate values and confidence intervals, plus curated Dryad growth-curve relative-fitness observations for the existing strain/replicate/final-generation calibration slots. Every fitness value names its same-batch ancestor control. The dataset still does not contain mutation-count/genome-decay costs or robustness observations, so decay and robustness conclusions remain unsupported.
 
-Next required dataset work: extract exact fitness-vs-control values from Sprouffske et al. 2018 or its Dryad files if available. If exact numeric values are unavailable, record the value as missing and document whether figure digitisation would be required.
+The curated relative-fitness values are computed from Dryad `growth-curves.txt` as `r_evo - r_anc`, following the paper methods. The raw Dryad final timepoint is generation `2907`; the paper labels this final timepoint as approximately `3000` generations, and the processed rows preserve that context in curation notes.
 
 In calibrated mode, the app derives the evaluated mutation-rate range from the selected strain and closest experimental generation in `calibration_dataset_v0` before computing thresholds. The generation horizon control selects the nearest experimental generation for calibration. Every model input is displayed with provenance: empirical, fitted, assumed, or unsupported by the current data. Parameters that cannot yet be estimated from exact observations remain marked as unsupported exploratory fallbacks rather than fitted values.
 
@@ -266,10 +266,10 @@ Start with:
 
 Likely next development steps:
 
-1. extract exact fitness-vs-control values from Sprouffske et al. 2018 or its Dryad files if available
+1. add the full Sprouffske growth-curve trajectory rows for intermediate generations
 2. separate placeholder/schema rows from real processed observations
 3. compare deterministic curves against curated data points
 4. replace deprecated Streamlit `use_container_width` calls with `width`
 5. add validation plots
 6. document which assumptions are supported, weakly supported, or contradicted
-7. only then consider calibration or stochastic simulation
+7. only then consider stochastic simulation

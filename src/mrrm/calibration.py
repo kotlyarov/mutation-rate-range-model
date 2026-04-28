@@ -183,9 +183,14 @@ def derive_calibrated_parameters(
     fitness_rows = _rows_with_measurement(selected_observations, "fitness")
     missing_fitness_rows = _missing_rows_with_measurement(selected_observations, "fitness")
     decay_rows = _rows_with_decay_measurements(selected_observations)
+    benefit_rows = _benefit_fit_rows(fitness_rows)
+    negative_fitness_count = sum(
+        row.get("measurement_value") is not None and row["measurement_value"] < 0
+        for row in fitness_rows
+    )
 
-    if fitness_rows:
-        fitted = _fit_benefit_parameters(fitness_rows, working_params)
+    if benefit_rows:
+        fitted = _fit_benefit_parameters(benefit_rows, working_params)
         updates.update(fitted)
         working_params = replace(base_params, **updates)
         for name in BENEFIT_PARAMETER_NAMES:
@@ -196,7 +201,12 @@ def derive_calibrated_parameters(
                 upper=None,
                 provenance=PROVENANCE_FITTED,
                 source=_selected_source_label(strain, closest, "fitness-vs-control rows"),
-                notes="Estimated by deterministic least-squares fit to exact selected fitness observations.",
+                notes=(
+                    "Estimated by deterministic least-squares fit to exact selected "
+                    "non-negative fitness observations. "
+                    f"Excluded {negative_fitness_count} negative relative-fitness row(s) "
+                    "because the current benefit curve is non-negative."
+                ),
             )
 
     if decay_rows:
@@ -384,8 +394,8 @@ def _fallback_provenance(name: str) -> tuple[str, str, str]:
     if name in BENEFIT_PARAMETER_NAMES:
         return (
             PROVENANCE_UNSUPPORTED,
-            "no exact fitness-vs-control values in calibration_dataset_v0",
-            "Exploratory fallback value only; requires exact fitness observations to fit.",
+            "selected calibration rows do not identify a non-negative benefit curve",
+            "Exploratory fallback value only; requires exact non-negative fitness observations to fit.",
         )
     if name in DECAY_PARAMETER_NAMES:
         return (
@@ -413,6 +423,17 @@ def _rows_with_measurement(observations: list[dict[str, Any]], token: str) -> li
         if token in row.get("measurement_kind", "")
         and row.get("measurement_value") is not None
         and row.get("mutation_rate_multiplier") is not None
+    ]
+
+
+def _benefit_fit_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        row
+        for row in rows
+        if row.get("generation") is not None
+        and row["generation"] > 0
+        and row.get("measurement_value") is not None
+        and row["measurement_value"] >= 0
     ]
 
 

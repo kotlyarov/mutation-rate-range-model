@@ -20,11 +20,11 @@
       "source_url": "https://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1007324",
       "source_type": "paper_with_data_repository",
       "citation": "Sprouffske K, Aguilar-Rodriguez J, Sniegowski P, Wagner A. 2018. High mutation rates limit evolutionary adaptation in Escherichia coli. PLOS Genetics 14(4): e1007324.",
-      "license_or_terms": "Creative Commons Attribution License listed by PLOS article.",
-      "download_method": "PLOS supplementary S3 Table downloaded manually from article file endpoint; Dryad phenotyping archive not imported.",
-      "raw_filename": "data/raw/sprouffske_2018/s3_genomic_mutation_rates.xlsx",
+      "license_or_terms": "PLOS article lists Creative Commons Attribution License; Dryad dataset lists CC0 public domain dedication.",
+      "download_method": "PLOS supplementary S3 Table downloaded manually from article file endpoint; Dryad phenotyping archive downloaded from https://doi.org/10.5061/dryad.mh206.",
+      "raw_filename": "data/raw/sprouffske_2018/s3_genomic_mutation_rates.xlsx; data/raw/sprouffske_2018/phenotyping_data.tar.gz",
       "processing_script": "manual curation into data/processed/calibration_dataset_v0.csv",
-      "notes": "Relevant for engineered E. coli mutation-rate treatments, selected-environment growth, robustness assays, and sequencing results. calibration_dataset_v0 currently includes S3 genomic mutation-rate values and confidence intervals, plus explicit missing-value slots for fitness/growth rows."
+      "notes": "Relevant for engineered E. coli mutation-rate treatments, selected-environment growth, robustness assays, and sequencing results. calibration_dataset_v0 currently includes S3 genomic mutation-rate values and confidence intervals plus Dryad growth-curve relative-fitness observations with named same-batch ancestor controls."
     },
     {
       "source_id": "couce_2017",

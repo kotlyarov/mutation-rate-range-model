@@ -38,12 +38,13 @@ def test_every_model_parameter_has_provenance():
 def test_unsupported_parameters_are_not_silently_presented_as_fitted():
     calibration = derive_calibrated_parameters()
 
-    assert calibration.fitness_observation_count == 0
-    assert calibration.missing_fitness_observation_count == 34
+    assert calibration.fitness_observation_count == 34
+    assert calibration.missing_fitness_observation_count == 0
     assert calibration.decay_observation_count == 0
-    assert calibration.estimates["beta_interference"].provenance == PROVENANCE_UNSUPPORTED
+    assert calibration.estimates["beta_interference"].provenance == PROVENANCE_FITTED
     assert calibration.estimates["gamma_decay"].provenance == PROVENANCE_UNSUPPORTED
-    assert "requires exact fitness observations" in calibration.estimates["beta_interference"].notes
+    assert "non-negative fitness observations" in calibration.estimates["beta_interference"].notes
+    assert "requires exact decay observations" in calibration.estimates["gamma_decay"].notes
 
 
 def test_calibrated_thresholds_are_sensitive_to_observed_mutation_axis():
@@ -83,6 +84,15 @@ def test_selected_strain_and_generation_drive_calibrated_axis():
     assert mrs.params.m_max == pytest.approx(16.92)
     assert mrxl.params.m_max == pytest.approx(75.04)
     assert evaluate_model(mrs.params).range_estimate.mu_max != evaluate_model(mrxl.params).range_estimate.mu_max
+
+
+def test_negative_relative_fitness_rows_are_raw_data_not_benefit_fit_inputs():
+    observations = load_calibration_dataset()
+    calibration = derive_calibrated_parameters(observations, strain="MRXL", target_generation=3000)
+
+    assert calibration.fitness_observation_count == 8
+    assert calibration.estimates["benefit_scale"].provenance == PROVENANCE_FITTED
+    assert "Excluded 3 negative relative-fitness row(s)" in calibration.estimates["benefit_scale"].notes
 
 
 def test_exact_fitness_rows_fit_benefit_parameters_when_curated():

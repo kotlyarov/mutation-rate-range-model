@@ -13,51 +13,48 @@ def make_raw_observation_figure(observations: list[dict]) -> go.Figure:
     fig = go.Figure()
     strains = sorted({row["strain_or_population"] for row in observations})
     for strain in strains:
-        rows = [
+        mutation_rows = [
             row
             for row in observations
             if row["strain_or_population"] == strain
             and row["measurement_kind"] == "genomic_mutation_rate_U"
         ]
-        if not rows:
-            continue
-        x_values = [row["mutation_rate_multiplier"] for row in rows]
-        y_values = [row["measurement_value"] for row in rows]
-        lower_errors = [
-            row["measurement_value"] - row["measurement_lower"]
-            for row in rows
+        if mutation_rows:
+            _add_raw_scatter(
+                fig,
+                rows=mutation_rows,
+                name=f"{strain} mutation rate",
+                yaxis="y",
+                hover_measure="U",
+            )
+
+        fitness_rows = [
+            row
+            for row in observations
+            if row["strain_or_population"] == strain
+            and row["measurement_kind"] == "relative_fitness"
+            and row["measurement_value"] is not None
         ]
-        upper_errors = [
-            row["measurement_upper"] - row["measurement_value"]
-            for row in rows
-        ]
-        labels = [
-            f"{row['strain_or_population']} {row['replicate']} generation {row['generation']}"
-            for row in rows
-        ]
-        fig.add_scatter(
-            x=x_values,
-            y=y_values,
-            error_y={
-                "type": "data",
-                "array": upper_errors,
-                "arrayminus": lower_errors,
-                "visible": True,
-            },
-            mode="markers",
-            name=strain,
-            text=labels,
-            hovertemplate=(
-                "%{text}<br>"
-                "mutation-rate multiplier=%{x:.3g}<br>"
-                "U=%{y:.3g}<extra></extra>"
-            ),
-        )
+        if fitness_rows:
+            _add_raw_scatter(
+                fig,
+                rows=fitness_rows,
+                name=f"{strain} relative fitness",
+                yaxis="y2",
+                hover_measure="relative fitness",
+                marker_symbol="x",
+            )
 
     fig.update_layout(
-        title="Raw Sprouffske et al. 2018 mutation-rate observations",
+        title="Raw Sprouffske et al. 2018 observations",
         xaxis_title="Derived mutation-rate multiplier relative to MRS ancestor U",
         yaxis_title="Genomic mutation rate U",
+        yaxis2={
+            "title": "Relative fitness, r_evo - r_anc",
+            "overlaying": "y",
+            "side": "right",
+            "zeroline": True,
+        },
         xaxis_type="log",
         yaxis_type="log",
         legend_title="Strain",
@@ -65,6 +62,54 @@ def make_raw_observation_figure(observations: list[dict]) -> go.Figure:
         margin={"l": 48, "r": 24, "t": 56, "b": 48},
     )
     return fig
+
+
+def _add_raw_scatter(
+    fig: go.Figure,
+    rows: list[dict],
+    name: str,
+    yaxis: str,
+    hover_measure: str,
+    marker_symbol: str = "circle",
+) -> None:
+    x_values = [row["mutation_rate_multiplier"] for row in rows]
+    y_values = [row["measurement_value"] for row in rows]
+    lower_errors = [
+        row["measurement_value"] - row["measurement_lower"]
+        if row["measurement_lower"] is not None
+        else 0
+        for row in rows
+    ]
+    upper_errors = [
+        row["measurement_upper"] - row["measurement_value"]
+        if row["measurement_upper"] is not None
+        else 0
+        for row in rows
+    ]
+    labels = [
+        f"{row['strain_or_population']} {row['replicate']} generation {row['generation']}"
+        for row in rows
+    ]
+    fig.add_scatter(
+        x=x_values,
+        y=y_values,
+        error_y={
+            "type": "data",
+            "array": upper_errors,
+            "arrayminus": lower_errors,
+            "visible": True,
+        },
+        mode="markers",
+        marker={"symbol": marker_symbol},
+        name=name,
+        text=labels,
+        yaxis=yaxis,
+        hovertemplate=(
+            "%{text}<br>"
+            "mutation-rate multiplier=%{x:.3g}<br>"
+            f"{hover_measure}=%{{y:.3g}}<extra></extra>"
+        ),
+    )
 
 
 def make_curve_figure(results: ModelResults) -> go.Figure:

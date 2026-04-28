@@ -132,6 +132,16 @@ def test_calibration_dataset_v0_loads_real_sprouffske_values():
         for row in observations
         if row["observation_id"] == "sprouffske_2018_s3_mrxl_ancestor_U"
     )
+    mrs_fitness = next(
+        row
+        for row in observations
+        if row["observation_id"] == "sprouffske_2018_growth_mrs_rep1_relative_fitness"
+    )
+    negative_fitness = next(
+        row
+        for row in observations
+        if row["observation_id"] == "sprouffske_2018_growth_mrs_rep8_relative_fitness"
+    )
 
     assert len(observations) == 68
     assert ancestor["measurement_value"] == 0.00034
@@ -140,8 +150,14 @@ def test_calibration_dataset_v0_loads_real_sprouffske_values():
     assert ancestor["mutation_rate_multiplier"] == 1.0
     assert mrxl["measurement_value"] == 0.03596
     assert mrxl["mutation_rate_multiplier"] > 100
-    assert sum(row["uncertainty_type"] == "interval" for row in observations) == 34
-    assert sum(row["uncertainty_type"] == "missing" for row in observations) == 34
+    assert mrs_fitness["measurement_value"] == pytest.approx(0.774572222222)
+    assert mrs_fitness["fitness_control"] == "MRS same-batch ancestor mean r"
+    assert "r_evo - r_anc" in mrs_fitness["measurement_units"]
+    assert negative_fitness["measurement_value"] < 0
+    assert negative_fitness["uncertainty_type"] == "distribution"
+    assert sum(row["uncertainty_type"] == "interval" for row in observations) == 38
+    assert sum(row["uncertainty_type"] == "distribution" for row in observations) == 30
+    assert sum(row["uncertainty_type"] == "missing" for row in observations) == 0
     assert all(row["calibration_role"] == "raw_observation_not_fit" for row in observations)
 
 
@@ -150,8 +166,8 @@ def test_calibration_inventory_is_data_first_not_fit():
 
     assert inventory["dataset_version"] == "calibration_dataset_v0"
     assert inventory["observation_count"] == 68
-    assert inventory["fitness_observation_count"] == 0
-    assert inventory["missing_fitness_observation_count"] == 34
+    assert inventory["fitness_observation_count"] == 34
+    assert inventory["missing_fitness_observation_count"] == 0
     assert inventory["measurement_kinds"] == {
         "genomic_mutation_rate_U": 34,
         "relative_fitness": 34,

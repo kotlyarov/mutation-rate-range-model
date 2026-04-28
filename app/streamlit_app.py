@@ -291,18 +291,16 @@ def _render_calibration_dataset(calibration: CalibrationResult | None = None) ->
     st.subheader("Raw experimental observations")
     st.info(
         "calibration_dataset_v0 currently contains real Sprouffske et al. 2018 "
-        "mutation-rate values and confidence intervals, plus explicit missing "
-        "fitness/growth slots by strain, replicate, and generation. It does not "
-        "yet contain exact fitness-vs-control values, mutation-count/genome-decay "
-        "costs, or fitted benefit/decay curves. Therefore it anchors the "
-        "mutation-rate axis and prepares the fitness-calibration path, but does "
-        "not yet answer the main biological question."
+        "mutation-rate values and confidence intervals, plus curated Dryad "
+        "growth-curve relative-fitness observations for the existing strain, "
+        "replicate, and final-generation calibration slots. Fitness values name "
+        "their same-batch ancestor controls. The dataset still does not contain "
+        "mutation-count/genome-decay costs or robustness observations."
     )
     st.caption(
-        "Next required dataset work: extract exact fitness-vs-control values "
-        "from Sprouffske et al. 2018 or its Dryad files if available. If exact "
-        "numeric values are unavailable, record the value as missing and "
-        "document whether figure digitisation would be required."
+        "Curated relative-fitness values are r_evo - r_anc from Dryad "
+        "growth-curves.txt. The raw Dryad final timepoint is generation 2907; "
+        "the paper labels this final timepoint as approximately 3000 generations."
     )
 
     try:
@@ -324,7 +322,7 @@ def _render_calibration_dataset(calibration: CalibrationResult | None = None) ->
     cols = st.columns(3)
     cols[0].metric("raw observations", inventory["observation_count"])
     cols[1].metric("fitness values", inventory["fitness_observation_count"])
-    cols[2].metric("missing fitness slots", inventory["missing_fitness_observation_count"])
+    cols[2].metric("missing fitness rows", inventory["missing_fitness_observation_count"])
 
     if calibration is not None:
         st.caption(

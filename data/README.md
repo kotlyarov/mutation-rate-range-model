@@ -7,10 +7,13 @@ This directory is for empirical data used by the Mutation Rate Range Model.
 The repository includes a small source registry and an example processed
 observation file for schema validation. It also includes
 `calibration_dataset_v0.csv`, a first real-value processed dataset seeded from
-Sprouffske et al. 2018 supplementary S3 genomic mutation-rate values.
+Sprouffske et al. 2018 supplementary S3 genomic mutation-rate values and Dryad
+growth-curve relative-fitness observations.
 
-These files are not calibrated model inputs. The deterministic model should
-continue to work without treating empirical observations as fitted parameters.
+These files are raw experimental inputs for calibration, not validated
+biological conclusions. The deterministic model should continue to work while
+showing which parameters are fitted from observations and which remain assumed
+or unsupported.
 
 ## Directory structure
 
@@ -19,6 +22,10 @@ data/
   source_registry.json
   raw/
     sprouffske_2018/
+      phenotyping_data.tar.gz
+      phenotyping_data/
+        growth-curves.txt
+        README.txt
       s3_genomic_mutation_rates.xlsx
   processed/
     example_observations.csv
@@ -45,10 +52,11 @@ used to make model conclusions.
 
 The current `calibration_dataset_v0.csv` file contains raw or directly derived
 experimental observations only. It starts with Sprouffske et al. 2018 S3
-genomic mutation-rate values and explicit missing-value slots for matching
-fitness/growth rows. Exact fitness values are not included in v0 because the
-exact raw fitness table has not yet been curated. Any future numeric fitness
-row must name its control.
+genomic mutation-rate values and Dryad growth-curve relative-fitness rows for
+the matching final-generation calibration slots. Fitness values are computed
+as `r_evo - r_anc`, where `r_anc` is the mean same-strain ancestor growth rate
+from the matched growth-curve batch. Every numeric fitness row names its
+control.
 
 ## `external/`
 
