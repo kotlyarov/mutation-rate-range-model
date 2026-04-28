@@ -143,13 +143,6 @@ def make_curve_figure(results: ModelResults) -> go.Figure:
     if results.survival_selection.enabled:
         fig.add_scatter(
             x=results.m_values,
-            y=results.survival_selection.post_selection_score,
-            mode="lines",
-            name="S after survival filtering",
-            line={"dash": "dash"},
-        )
-        fig.add_scatter(
-            x=results.m_values,
             y=results.survival_selection.contribution_weight,
             mode="lines",
             name="survival contribution",

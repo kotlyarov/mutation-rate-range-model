@@ -88,9 +88,9 @@ The optional Survival Selection block assumes that mutation-rate classes with
 higher net scores contribute more to the next threshold landscape under
 replacement competition.
 
-The first implementation uses expected fitness-weighted survival probabilities.
-It does not create explicit organisms, lineages, transfers, nutrient dynamics, or
-experimental bottleneck protocols.
+The first implementation uses expected fitness-weighted survival probabilities
+inside the generation loop. It does not create explicit organisms, lineages,
+transfers, nutrient dynamics, or experimental bottleneck protocols.
 
 `population_growth_factor` is only a pressure modifier:
 
@@ -98,9 +98,10 @@ experimental bottleneck protocols.
 - values below 1 strengthen selection by representing tighter replacement
   competition
 
-`survival_stochasticity` is implemented as deterministic neutral mixing in the
-expected survival probabilities. It represents probabilistic survival noise
-without sampling a random next generation.
+`survival_stochasticity` is implemented as deterministic neutral mixing between
+fitness-weighted survival and the previous generation's composition. It
+represents probabilistic survival noise without sampling a random next
+generation.
 
 The default value, `0.23`, is not a direct fitted survival parameter. It maps
 the closest experimental drift proxy found, LTEE ancestor descendant-number

@@ -49,11 +49,13 @@ class SurvivalSelectionResult:
 
     enabled: bool
     effective_selection_strength: float
+    generation_count: int
     relative_fitness: np.ndarray
     survival_probability: np.ndarray
     contribution_weight: np.ndarray
     post_selection_benefit: np.ndarray
     post_selection_decay: np.ndarray
+    post_selection_robustness: np.ndarray
     post_selection_score: np.ndarray
 
 
@@ -91,12 +93,7 @@ def adaptive_benefit(m_values: np.ndarray, params: ModelParameters) -> np.ndarra
     validate_m_values(m_values)
 
     T_scaled = params.T / params.T_ref
-    supply_argument = params.alpha_benefit * m_values * T_scaled
-    beneficial_supply = -np.expm1(-np.clip(supply_argument, 0.0, MAX_EXP_ARGUMENT))
-    interference = 1.0 / (
-        1.0 + params.beta_interference * np.power(m_values, params.gamma_interference)
-    )
-    values = params.benefit_scale * beneficial_supply * interference
+    values = _adaptive_benefit_for_scaled_time(m_values, params, T_scaled)
     _require_finite("adaptive benefit", values)
     return values
 
@@ -109,7 +106,7 @@ def decay_proxy(m_values: np.ndarray, params: ModelParameters) -> np.ndarray:
     validate_m_values(m_values)
 
     T_scaled = params.T / params.T_ref
-    values = params.decay_scale * np.power(m_values, params.gamma_decay) * T_scaled
+    values = _decay_proxy_for_scaled_time(m_values, params, T_scaled)
     _require_finite("decay proxy", values)
     return values
 
@@ -132,8 +129,7 @@ def robustness(
     if not np.all(decay_values >= 0):
         raise ValueError("decay_values must be non-negative.")
 
-    argument = params.k_robustness * decay_values
-    values = np.exp(-np.clip(argument, 0.0, MAX_EXP_ARGUMENT))
+    values = _robustness_from_decay(decay_values, params)
     _require_finite("robustness", values)
     return values
 
@@ -153,47 +149,53 @@ def net_score(
     if not (benefit_values.shape == decay_values.shape == robustness_values.shape):
         raise ValueError("benefit, decay, and robustness arrays must have the same shape.")
 
-    values = (
-        benefit_values
-        - params.lambda_decay * decay_values
-        + params.rho_robustness * robustness_values
+    values = _net_score_from_components(
+        benefit_values,
+        decay_values,
+        robustness_values,
+        params,
     )
     _require_finite("net score", values)
     return values
 
 
 def survival_selection(
+    m_values: np.ndarray,
     benefit_values: np.ndarray,
     decay_values: np.ndarray,
     robustness_values: np.ndarray,
     score_values: np.ndarray,
     params: ModelParameters,
 ) -> SurvivalSelectionResult:
-    """Apply expected fitness-weighted survival filtering.
+    """Apply recursive expected fitness-weighted survival filtering.
 
     The layer is a soft-selection expectation, not an individual-based
-    simulation. Survival probabilities are proportional to positive relative
-    fitness weights derived from the net score, then mixed with neutral
-    survival according to ``survival_stochasticity``.
+    simulation. Population composition is updated once per model generation,
+    using fitness-weighted survival mixed with neutral survival according to
+    ``survival_stochasticity``.
     """
 
     validate_parameters(params)
+    m_values = _as_float_array(m_values)
     benefit_values = _as_float_array(benefit_values)
     decay_values = _as_float_array(decay_values)
     robustness_values = _as_float_array(robustness_values)
     score_values = _as_float_array(score_values)
+    validate_m_values(m_values)
     if score_values.ndim != 1 or score_values.size < 2:
         raise ValueError("survival selection arrays must contain at least two points.")
     if not (
-        benefit_values.shape
+        m_values.shape
+        == benefit_values.shape
         == decay_values.shape
         == robustness_values.shape
         == score_values.shape
     ):
         raise ValueError(
-            "benefit, decay, robustness, and score arrays must have the same shape."
+            "m_values, benefit, decay, robustness, and score arrays must have the same shape."
         )
     for label, values in {
+        "m_values": m_values,
         "benefit": benefit_values,
         "decay": decay_values,
         "robustness": robustness_values,
@@ -211,40 +213,87 @@ def survival_selection(
         return SurvivalSelectionResult(
             enabled=False,
             effective_selection_strength=0.0,
+            generation_count=0,
             relative_fitness=neutral_weight,
             survival_probability=neutral_probability,
             contribution_weight=neutral_weight,
             post_selection_benefit=benefit_values.copy(),
             post_selection_decay=decay_values.copy(),
+            post_selection_robustness=robustness_values.copy(),
             post_selection_score=score_values.copy(),
         )
 
     effective_selection_strength = (
         params.selection_strength / params.population_growth_factor
     )
-    relative_fitness = _relative_fitness_from_score(
-        score_values,
-        effective_selection_strength,
-    )
-    fitness_weighted_probability = relative_fitness / np.sum(relative_fitness)
+    generation_count = _generation_count(params)
+    total_scaled_time = params.T / params.T_ref
     stochasticity = params.survival_stochasticity
-    survival_probability = (
-        (1.0 - stochasticity) * fitness_weighted_probability
-        + stochasticity * neutral_probability
-    )
-    survival_probability = survival_probability / np.sum(survival_probability)
-    survival_probability = np.maximum(survival_probability, MIN_SURVIVAL_PROBABILITY)
-    survival_probability = survival_probability / np.sum(survival_probability)
-    contribution_weight = survival_probability / neutral_probability
+    composition = neutral_probability.copy()
+    post_selection_benefit = np.zeros_like(score_values, dtype=float)
+    post_selection_decay = np.zeros_like(score_values, dtype=float)
+    previous_benefit = np.zeros_like(score_values, dtype=float)
+    previous_decay = np.zeros_like(score_values, dtype=float)
+    relative_fitness = np.ones_like(score_values, dtype=float)
 
-    post_selection_benefit = benefit_values * contribution_weight
-    post_selection_decay = decay_values * contribution_weight
-    post_selection_score = _post_selection_score(score_values, contribution_weight)
+    for generation in range(1, generation_count + 1):
+        scaled_time = total_scaled_time * (generation / generation_count)
+        current_benefit = _adaptive_benefit_for_scaled_time(
+            m_values,
+            params,
+            scaled_time,
+        )
+        current_decay = _decay_proxy_for_scaled_time(m_values, params, scaled_time)
+        current_robustness = _robustness_from_decay(current_decay, params)
+        current_score = _net_score_from_components(
+            current_benefit,
+            current_decay,
+            current_robustness,
+            params,
+        )
+
+        relative_fitness = _relative_fitness_from_score(
+            current_score,
+            effective_selection_strength,
+        )
+        selected_composition = composition * relative_fitness
+        selected_total = float(np.sum(selected_composition))
+        if selected_total <= 0 or not np.isfinite(selected_total):
+            selected_composition = composition.copy()
+        else:
+            selected_composition = selected_composition / selected_total
+
+        next_composition = (
+            (1.0 - stochasticity) * selected_composition
+            + stochasticity * composition
+        )
+        next_composition = _normalize_probability(next_composition)
+        contribution_weight = next_composition / neutral_probability
+
+        benefit_increment = current_benefit - previous_benefit
+        decay_increment = current_decay - previous_decay
+        post_selection_benefit += benefit_increment * contribution_weight
+        post_selection_decay += decay_increment * contribution_weight
+
+        composition = next_composition
+        previous_benefit = current_benefit
+        previous_decay = current_decay
+
+    survival_probability = composition
+    contribution_weight = survival_probability / neutral_probability
+    post_selection_robustness = _robustness_from_decay(post_selection_decay, params)
+    post_selection_score = _net_score_from_components(
+        post_selection_benefit,
+        post_selection_decay,
+        post_selection_robustness,
+        params,
+    )
     for label, values in {
         "survival probability": survival_probability,
         "survival contribution weight": contribution_weight,
         "post-selection benefit": post_selection_benefit,
         "post-selection decay": post_selection_decay,
+        "post-selection robustness": post_selection_robustness,
         "post-selection score": post_selection_score,
     }.items():
         _require_finite(label, values)
@@ -252,11 +301,13 @@ def survival_selection(
     return SurvivalSelectionResult(
         enabled=True,
         effective_selection_strength=float(effective_selection_strength),
+        generation_count=generation_count,
         relative_fitness=relative_fitness,
         survival_probability=survival_probability,
         contribution_weight=contribution_weight,
         post_selection_benefit=post_selection_benefit,
         post_selection_decay=post_selection_decay,
+        post_selection_robustness=post_selection_robustness,
         post_selection_score=post_selection_score,
     )
 
@@ -334,6 +385,7 @@ def evaluate_model(params: ModelParameters | None = None) -> ModelResults:
         score_values,
     )
     survival_values = survival_selection(
+        m_values,
         benefit_values,
         decay_values,
         robustness_values,
@@ -344,23 +396,23 @@ def evaluate_model(params: ModelParameters | None = None) -> ModelResults:
         m_values,
         survival_values.post_selection_benefit,
         survival_values.post_selection_decay,
-        robustness_values,
+        survival_values.post_selection_robustness,
         survival_values.post_selection_score,
     )
     range_estimate = estimate_range(
         m_values,
         survival_values.post_selection_benefit,
         survival_values.post_selection_decay,
-        robustness_values,
+        survival_values.post_selection_robustness,
         survival_values.post_selection_score,
         params,
     )
     return ModelResults(
         m_values=m_values,
-        benefit=benefit_values,
-        decay=decay_values,
-        robustness=robustness_values,
-        score=score_values,
+        benefit=survival_values.post_selection_benefit,
+        decay=survival_values.post_selection_decay,
+        robustness=survival_values.post_selection_robustness,
+        score=survival_values.post_selection_score,
         survival_selection=survival_values,
         range_estimate=range_estimate,
     )
@@ -368,6 +420,57 @@ def evaluate_model(params: ModelParameters | None = None) -> ModelResults:
 
 def _as_float_array(values: Any) -> np.ndarray:
     return np.asarray(values, dtype=float)
+
+
+def _adaptive_benefit_for_scaled_time(
+    m_values: np.ndarray,
+    params: ModelParameters,
+    T_scaled: float,
+) -> np.ndarray:
+    supply_argument = params.alpha_benefit * m_values * T_scaled
+    beneficial_supply = -np.expm1(-np.clip(supply_argument, 0.0, MAX_EXP_ARGUMENT))
+    interference = 1.0 / (
+        1.0 + params.beta_interference * np.power(m_values, params.gamma_interference)
+    )
+    return params.benefit_scale * beneficial_supply * interference
+
+
+def _decay_proxy_for_scaled_time(
+    m_values: np.ndarray,
+    params: ModelParameters,
+    T_scaled: float,
+) -> np.ndarray:
+    return params.decay_scale * np.power(m_values, params.gamma_decay) * T_scaled
+
+
+def _robustness_from_decay(
+    decay_values: np.ndarray,
+    params: ModelParameters,
+) -> np.ndarray:
+    argument = params.k_robustness * decay_values
+    return np.exp(-np.clip(argument, 0.0, MAX_EXP_ARGUMENT))
+
+
+def _net_score_from_components(
+    benefit_values: np.ndarray,
+    decay_values: np.ndarray,
+    robustness_values: np.ndarray,
+    params: ModelParameters,
+) -> np.ndarray:
+    return (
+        benefit_values
+        - params.lambda_decay * decay_values
+        + params.rho_robustness * robustness_values
+    )
+
+
+def _generation_count(params: ModelParameters) -> int:
+    return max(1, int(round(params.T)))
+
+
+def _normalize_probability(values: np.ndarray) -> np.ndarray:
+    values = np.maximum(values, MIN_SURVIVAL_PROBABILITY)
+    return values / np.sum(values)
 
 
 def _relative_fitness_from_score(
@@ -386,13 +489,6 @@ def _relative_fitness_from_score(
     if not np.any(values > 0):
         return np.ones_like(score_values, dtype=float)
     return values
-
-
-def _post_selection_score(
-    score_values: np.ndarray,
-    contribution_weight: np.ndarray,
-) -> np.ndarray:
-    return score_values + np.log(contribution_weight)
 
 
 def _require_finite(label: str, values: np.ndarray) -> None:

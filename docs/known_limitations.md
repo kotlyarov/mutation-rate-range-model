@@ -59,8 +59,9 @@ not a Wright-Fisher or Moran simulation.
 `population_growth_factor` changes effective selection pressure only. It is not a
 nutrient, dilution, transfer, resource, or culture-volume submodel.
 
-`survival_stochasticity` mixes fitness-weighted survival with neutral expected
-survival. It does not draw random survivors or estimate uncertainty.
+`survival_stochasticity` mixes fitness-weighted survival with the previous
+generation's composition in the deterministic generation loop. It does not draw
+random survivors or estimate uncertainty.
 
 The `0.23` default is an experimentally motivated proxy from descendant-number
 variance, not a proven universal survival-stochasticity value.

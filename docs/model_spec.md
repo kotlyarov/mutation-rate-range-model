@@ -155,24 +155,29 @@ survival filtering changes which mutation-rate classes contribute to thresholds
 ```
 
 It must remain a simple deterministic expectation, not an individual-based
-simulation. The first implementation uses soft selection / fitness-weighted
-sampling:
+simulation. Selection is applied recursively across the model horizon, not as a
+final multiplier on completed curves:
 
 ```text
 effective_selection_strength = selection_strength / population_growth_factor
+G = round(T)
+p_i(0) = 1 / n_points
 
-relative_fitness_i =
-  exp(effective_selection_strength * (S_i - max(S)))
+for generation g in 1..G:
+  compute B_i(g), D_i(g), R_i(g), and S_i(g)
 
-fitness_weighted_survival_i =
-  relative_fitness_i / sum(relative_fitness)
+  relative_fitness_i(g) =
+    exp(effective_selection_strength * (S_i(g) - max(S(g))))
 
-survival_probability_i =
-  (1 - survival_stochasticity) * fitness_weighted_survival_i
-  + survival_stochasticity * neutral_survival_i
+  fitness_weighted_survival_i(g) =
+    p_i(g - 1) * relative_fitness_i(g)
+    / sum_j(p_j(g - 1) * relative_fitness_j(g))
 
-neutral_survival_i = 1 / n_points
-contribution_weight_i = survival_probability_i / neutral_survival_i
+  p_i(g) =
+    (1 - survival_stochasticity) * fitness_weighted_survival_i(g)
+    + survival_stochasticity * p_i(g - 1)
+
+  contribution_weight_i(g) = p_i(g) / (1 / n_points)
 ```
 
 Interpretation:
@@ -190,15 +195,16 @@ Interpretation:
 The post-selection landscape used by threshold estimation is:
 
 ```text
-B_surv_i = B_i * contribution_weight_i
-D_surv_i = D_i * contribution_weight_i
-S_surv_i = S_i + log(contribution_weight_i)
+B_surv_i = sum_g((B_i(g) - B_i(g - 1)) * contribution_weight_i(g))
+D_surv_i = sum_g((D_i(g) - D_i(g - 1)) * contribution_weight_i(g))
+R_surv_i = exp(-k_robustness * D_surv_i)
+S_surv_i = B_surv_i - lambda_decay * D_surv_i + rho_robustness * R_surv_i
 ```
 
-`S_surv` preserves the raw score in the disabled/neutral case. The additive
-`log(contribution_weight)` term penalizes under-represented low-survival regions
-and rewards over-represented survivor regions on the same sign-preserving scale
-used to construct the exponential fitness weights.
+The disabled and fully neutral cases preserve the raw deterministic curves. With
+selection enabled, low-fitness mutation-rate bins are progressively
+underrepresented and high-fitness bins are progressively overrepresented across
+the generation loop.
 
 ## Derived range estimates
 
@@ -311,6 +317,7 @@ def net_score(
     ...
 
 def survival_selection(
+    m_values: np.ndarray,
     benefit_values: np.ndarray,
     decay_values: np.ndarray,
     robustness_values: np.ndarray,

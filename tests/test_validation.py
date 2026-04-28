@@ -6,7 +6,7 @@ from mrrm.validation import CurveValidationError, ParameterValidationError, vali
 
 
 def test_validate_curve_outputs_accepts_valid_model_results():
-    results = evaluate_model(ModelParameters(n_points=40))
+    results = evaluate_model(ModelParameters(T=100, T_ref=100, n_points=40))
 
     validate_curve_outputs(
         results.m_values,
@@ -18,7 +18,7 @@ def test_validate_curve_outputs_accepts_valid_model_results():
 
 
 def test_validate_curve_outputs_rejects_nan_values():
-    results = evaluate_model(ModelParameters(n_points=40))
+    results = evaluate_model(ModelParameters(T=100, T_ref=100, n_points=40))
     benefit = results.benefit.copy()
     benefit[0] = np.nan
 
@@ -33,7 +33,7 @@ def test_validate_curve_outputs_rejects_nan_values():
 
 
 def test_validate_curve_outputs_rejects_unbounded_robustness():
-    results = evaluate_model(ModelParameters(n_points=40))
+    results = evaluate_model(ModelParameters(T=100, T_ref=100, n_points=40))
     retained = results.robustness.copy()
     retained[0] = 1.2
 
