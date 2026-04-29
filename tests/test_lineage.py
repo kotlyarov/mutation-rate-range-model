@@ -30,6 +30,8 @@ def test_lineage_history_has_generation_axis_and_finite_metrics():
         assert np.all(np.isfinite(values.astype(float)))
     assert np.all(history["carrying_capacity"] == params.effective_population_size)
     assert np.all(history["actual_population_size"] <= params.effective_population_size)
+    assert np.all(history["actual_population_size"] <= history["viable_population_size"])
+    assert np.all(history["viable_population_size"] <= history["candidate_population_size"])
 
 
 def test_transition_probabilities_are_valid_and_sum_to_one():
@@ -123,17 +125,21 @@ def test_generation_records_split_offspring_into_mutation_classes():
     assert record.mixed_fraction > 0
 
 
-def test_population_capacity_is_not_guaranteed_refill_after_selection():
+def test_population_capacity_is_not_refilled_after_viability_filtering():
     params = LineageParameters(
         generations=1,
-        effective_population_size=1_000,
+        effective_population_size=10_000,
         mutation_rate_multiplier=1.0,
-        beneficial_mutation_rate=0.0,
+        beneficial_mutation_rate=1e9,
         neutral_mutation_rate=0.0,
-        deleterious_mutation_rate=1e9,
-        decay_effect_size=1.0,
-        decay_fitness_penalty=0.5,
+        deleterious_mutation_rate=0.02,
+        beneficial_effect_size=1.0,
+        benefit_saturation=10.0,
+        decay_effect_size=10.0,
+        decay_fitness_penalty=0.0,
         robustness_fitness_weight=0.0,
+        lethal_decay_threshold=5.0,
+        selection_strength=3.0,
         random_seed=8,
     )
     results = simulate_lineage_survival(params)
@@ -141,8 +147,10 @@ def test_population_capacity_is_not_guaranteed_refill_after_selection():
 
     assert record.carrying_capacity == params.effective_population_size
     assert record.candidate_population_size == params.effective_population_size
-    assert record.viable_population_size == params.effective_population_size
-    assert record.actual_population_size == 500
+    assert 0 < record.viable_population_size < params.effective_population_size
+    assert record.beneficial_mutation_offspring == record.viable_population_size
+    assert record.mixed_mutation_offspring > 0
+    assert record.actual_population_size == record.viable_population_size
 
 
 def test_population_can_collapse_when_all_candidates_are_nonviable():
@@ -284,7 +292,11 @@ def test_beneficial_effect_size_changes_competitive_success():
     )
     assert (
         high_effect.outcome.final_actual_population_size
-        > low_effect.outcome.final_actual_population_size
+        <= high_effect.outcome.final_viable_population_size
+    )
+    assert (
+        low_effect.outcome.final_actual_population_size
+        <= low_effect.outcome.final_viable_population_size
     )
 
 

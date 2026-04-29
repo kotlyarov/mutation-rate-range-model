@@ -142,17 +142,18 @@ separately reported even though survival selection uses the combined fitness.
 Survival selection is stochastic. Candidate offspring classes are sampled from
 the current lineage classes. Candidate classes below
 `viability_fitness_threshold`, above `lethal_decay_threshold`, or below
-`minimum_viable_robustness` are removed. Viable classes receive descendant
+`minimum_viable_robustness` are removed. Viable classes receive competitive
 weight proportional to:
 
 ```text
 class_count * fitness^selection_strength
 ```
 
-The next generation is sampled competitively from those descendant weights and
-is capped at `effective_population_size`. Fitness above 1 is not converted into
-a capped survival probability, so larger beneficial effects can improve lineage
-share and population recovery.
+The next generation size is capped by the viable offspring count and by
+`effective_population_size`. The competitive weights only determine how that
+viable population is distributed among lineage classes. Fitness above 1 is not
+converted into a capped survival probability and does not create replacement
+population after lethal filtering, but it can still improve lineage share.
 
 The model does not reset biological state each generation. Surviving classes
 carry accumulated benefit, accumulated decay, robustness, and fitness forward.

@@ -419,12 +419,12 @@ def _select_survivors(
             actual_population_size=0,
         )
 
-    descendant_weights = np.asarray(
-        [_descendant_weight(lineage, params) for lineage in viable_candidates],
+    competitive_weights = np.asarray(
+        [_competitive_weight(lineage, params) for lineage in viable_candidates],
         dtype=float,
     )
-    total_descendant_weight = float(np.sum(descendant_weights))
-    if not np.isfinite(total_descendant_weight) or total_descendant_weight <= 0:
+    total_competitive_weight = float(np.sum(competitive_weights))
+    if not np.isfinite(total_competitive_weight) or total_competitive_weight <= 0:
         return (), SelectionSummary(
             candidate_population_size=candidate_population_size,
             viable_population_size=viable_population_size,
@@ -434,7 +434,7 @@ def _select_survivors(
 
     next_population_size = min(
         int(params.effective_population_size),
-        int(round(total_descendant_weight)),
+        viable_population_size,
     )
     if next_population_size <= 0:
         return (), SelectionSummary(
@@ -444,7 +444,7 @@ def _select_survivors(
             actual_population_size=0,
         )
 
-    probabilities = descendant_weights / total_descendant_weight
+    probabilities = competitive_weights / total_competitive_weight
     survivor_counts = rng.multinomial(next_population_size, probabilities)
     survivors = [
         replace(lineage, count=int(count))
@@ -470,7 +470,7 @@ def _is_viable(lineage: LineageClass, params: LineageParameters) -> bool:
     )
 
 
-def _descendant_weight(lineage: LineageClass, params: LineageParameters) -> float:
+def _competitive_weight(lineage: LineageClass, params: LineageParameters) -> float:
     if not _is_viable(lineage, params):
         return 0.0
     if params.selection_strength == 0:

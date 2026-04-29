@@ -81,9 +81,10 @@ mechanistically simulated.
 Each generation has at most `effective_population_size` survivors.
 
 This captures integer stochasticity, lineage disappearance, and simple
-population decline. It still does not model absolute population growth,
-resource-dependent recovery, crash dynamics, or experimental extinction
-protocols mechanistically.
+population decline. After viability filtering, fitness weights change lineage
+proportions among viable offspring; they do not refill empty carrying capacity.
+The model still does not include a separate absolute growth, resource-dependent
+recovery, crash dynamics, or experimental extinction protocol.
 
 ## Event-rate assumptions are simple
 

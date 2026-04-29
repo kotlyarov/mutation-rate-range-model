@@ -195,27 +195,28 @@ viable_i =
   and D_i <= lethal_decay_threshold
   and R_i >= minimum_viable_robustness
 
-descendant_weight_i =
+competitive_weight_i =
   0, if viable_i is false
   candidate_count_i * fitness_i^selection_strength, otherwise
 
 actual_population_size_next =
-  min(effective_population_size, round(sum_i(descendant_weight_i)))
+  min(effective_population_size, viable_population_size)
 
 survivor_counts ~ Multinomial(
   actual_population_size_next,
-  descendant_weight / sum(descendant_weight)
+  competitive_weight / sum(competitive_weight)
 )
 
-actual_population_size_next <= effective_population_size
+actual_population_size_next <= viable_population_size <= candidate_population_size
 ```
 
 The next generation can be smaller than the carrying capacity. A badly damaged
 lineage does not survive just because empty capacity exists. Above the viability
 threshold, higher fitness improves competitive lineage success because it
-increases descendant weight without being capped at one. If all candidate
-classes are nonviable, the actual population size becomes zero and the run is
-collapsed.
+increases competitive weight without being capped at one. The competitive weight
+changes lineage proportions among viable offspring; it does not create extra
+population after nonviable offspring have been removed. If all candidate classes
+are nonviable, the actual population size becomes zero and the run is collapsed.
 
 This is stochastic lineage-class sampling, not a deterministic post-processing
 weight over mutation-rate bins.
