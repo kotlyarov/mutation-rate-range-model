@@ -221,22 +221,46 @@ are nonviable, the actual population size becomes zero and the run is collapsed.
 This is stochastic lineage-class sampling, not a deterministic post-processing
 weight over mutation-rate bins.
 
+## Trajectory classification
+
+The population trajectory chart classifies surviving lineage classes by their
+benefit-vs-decay balance:
+
+```text
+decay_pressure_i = decay_fitness_penalty * D_i
+benefit_decay_balance_i = B_i - decay_pressure_i
+
+mostly_beneficial_i = benefit_decay_balance_i > 0
+mostly_harmful_or_negative_i = benefit_decay_balance_i < 0
+neutral_or_exactly_balanced_i = benefit_decay_balance_i == 0
+
+benefit_led_population =
+  sum_i(class_count_i for surviving mostly_beneficial classes)
+
+decay_led_population =
+  sum_i(class_count_i for surviving mostly_harmful_or_negative classes)
+```
+
+These are population counts, not fractions. A balanced class contributes to the
+total population line but not to either benefit-led or decay-led lines.
+
 ## Main outputs
 
 The main chart uses:
 
 ```text
 X axis = generation
-Y axis = relative fitness
+primary Y axis = population size
+secondary Y axis = mean population fitness
 ```
 
 It should show:
 
 - starting generation
+- total surviving population size
+- population size of benefit-led lineage classes
+- population size of decay-led lineage classes
 - mean population fitness
-- best surviving lineage fitness
-- dominant lineage fitness
-- beneficial adoption fraction over time
 
 The run also reports:
 

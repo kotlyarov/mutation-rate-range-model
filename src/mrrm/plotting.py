@@ -175,61 +175,63 @@ def make_curve_figure(results: ModelResults) -> go.Figure:
     return fig
 
 
-def make_lineage_fitness_figure(results: LineageSimulationResult) -> go.Figure:
-    """Create a Plotly figure for generational lineage survival."""
+def make_lineage_population_figure(results: LineageSimulationResult) -> go.Figure:
+    """Create a Plotly figure for population survival by generation."""
 
     history = results.history_arrays()
     fig = go.Figure()
     fig.add_scatter(
         x=history["generation"],
+        y=history["actual_population_size"],
+        mode="lines",
+        name="Total population",
+        line={"width": 3},
+    )
+    fig.add_scatter(
+        x=history["generation"],
+        y=history["beneficial_dominant_population_size"],
+        mode="lines",
+        name="Benefit-led population",
+    )
+    fig.add_scatter(
+        x=history["generation"],
+        y=history["harmful_dominant_population_size"],
+        mode="lines",
+        name="Decay-led population",
+    )
+    fig.add_scatter(
+        x=history["generation"],
         y=history["mean_fitness"],
         mode="lines",
-        name="mean population fitness",
-    )
-    fig.add_scatter(
-        x=history["generation"],
-        y=history["best_fitness"],
-        mode="lines",
-        name="best surviving lineage fitness",
-        line={"dash": "dash"},
-    )
-    fig.add_scatter(
-        x=history["generation"],
-        y=history["dominant_fitness"],
-        mode="lines",
-        name="dominant lineage fitness",
-        line={"dash": "dot"},
-    )
-    fig.add_scatter(
-        x=history["generation"],
-        y=history["beneficial_adoption_fraction"],
-        mode="lines",
-        name="beneficial adoption fraction",
+        name="Mean fitness",
         yaxis="y2",
     )
-    fig.add_vline(
-        x=0,
-        line_width=1,
-        line_dash="dot",
-        annotation_text="start",
-        annotation_position="top left",
-    )
     fig.update_layout(
-        title="Generational lineage-survival trajectory",
+        title="Population survival trajectory",
         xaxis_title="Generation",
-        yaxis_title="Relative fitness",
+        yaxis={"title": "Population size", "rangemode": "tozero"},
         yaxis2={
-            "title": "Beneficial adoption fraction",
+            "title": "Mean fitness",
             "overlaying": "y",
             "side": "right",
-            "range": [0, 1],
+            "rangemode": "tozero",
             "showgrid": False,
         },
         legend_title="Trajectory",
         template="plotly_white",
+        hovermode="x unified",
         margin={"l": 48, "r": 24, "t": 56, "b": 48},
     )
     return fig
+
+
+def make_lineage_fitness_figure(results: LineageSimulationResult) -> go.Figure:
+    """Create the current lineage trajectory figure.
+
+    Kept as a compatibility alias for older callers.
+    """
+
+    return make_lineage_population_figure(results)
 
 
 def _add_marker(fig: go.Figure, value: float | None, label: str) -> None:

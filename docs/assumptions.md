@@ -158,6 +158,19 @@ population after lethal filtering, but it can still improve lineage share.
 The model does not reset biological state each generation. Surviving classes
 carry accumulated benefit, accumulated decay, robustness, and fitness forward.
 
+### Trajectory categories
+
+The main trajectory chart reports population counts, not only fitness or
+fractions. Surviving lineage classes are classified by the sign of:
+
+```text
+benefit_decay_balance = B - decay_fitness_penalty * D
+```
+
+Classes with positive balance contribute to the benefit-led population line.
+Classes with negative balance contribute to the decay-led population line.
+Classes with exactly zero balance appear only in the total population count.
+
 ## Modelling assumptions
 
 ### Aggregated lineage classes

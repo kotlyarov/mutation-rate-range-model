@@ -6,6 +6,7 @@ from mrrm import (
     mutation_transition_probabilities,
     simulate_lineage_survival,
 )
+from mrrm.plotting import make_lineage_population_figure
 from mrrm.validation import ParameterValidationError
 
 
@@ -32,6 +33,13 @@ def test_lineage_history_has_generation_axis_and_finite_metrics():
     assert np.all(history["actual_population_size"] <= params.effective_population_size)
     assert np.all(history["actual_population_size"] <= history["viable_population_size"])
     assert np.all(history["viable_population_size"] <= history["candidate_population_size"])
+    assert np.all(history["beneficial_dominant_population_size"] >= 0)
+    assert np.all(history["harmful_dominant_population_size"] >= 0)
+    assert np.all(
+        history["beneficial_dominant_population_size"]
+        + history["harmful_dominant_population_size"]
+        <= history["actual_population_size"]
+    )
 
 
 def test_transition_probabilities_are_valid_and_sum_to_one():
@@ -151,6 +159,80 @@ def test_population_capacity_is_not_refilled_after_viability_filtering():
     assert record.beneficial_mutation_offspring == record.viable_population_size
     assert record.mixed_mutation_offspring > 0
     assert record.actual_population_size == record.viable_population_size
+
+
+def test_trajectory_classification_counts_benefit_and_decay_led_populations():
+    beneficial_results = simulate_lineage_survival(
+        LineageParameters(
+            generations=1,
+            effective_population_size=1_000,
+            mutation_rate_multiplier=1.0,
+            beneficial_mutation_rate=1e9,
+            neutral_mutation_rate=0.0,
+            deleterious_mutation_rate=0.0,
+            beneficial_effect_size=0.2,
+            random_seed=15,
+        )
+    )
+    beneficial_record = beneficial_results.history[-1]
+
+    assert beneficial_record.beneficial_dominant_population_size == 1_000
+    assert beneficial_record.harmful_dominant_population_size == 0
+
+    harmful_results = simulate_lineage_survival(
+        LineageParameters(
+            generations=1,
+            effective_population_size=1_000,
+            mutation_rate_multiplier=1.0,
+            beneficial_mutation_rate=0.0,
+            neutral_mutation_rate=0.0,
+            deleterious_mutation_rate=1e9,
+            decay_effect_size=1.0,
+            decay_fitness_penalty=0.2,
+            lethal_decay_threshold=100.0,
+            robustness_fitness_weight=0.0,
+            random_seed=16,
+        )
+    )
+    harmful_record = harmful_results.history[-1]
+
+    assert harmful_record.beneficial_dominant_population_size == 0
+    assert harmful_record.harmful_dominant_population_size == 1_000
+
+
+def test_population_trajectory_figure_uses_population_counts_and_solid_lines():
+    params = LineageParameters(
+        generations=3,
+        effective_population_size=1_000,
+        mutation_rate_multiplier=1.0,
+        beneficial_mutation_rate=0.1,
+        neutral_mutation_rate=0.0,
+        deleterious_mutation_rate=0.1,
+        random_seed=18,
+    )
+    results = simulate_lineage_survival(params)
+    figure = make_lineage_population_figure(results)
+
+    assert [trace.name for trace in figure.data] == [
+        "Total population",
+        "Benefit-led population",
+        "Decay-led population",
+        "Mean fitness",
+    ]
+    assert [trace.yaxis for trace in figure.data] == [None, None, None, "y2"]
+    assert all(trace.mode == "lines" for trace in figure.data)
+    assert all(trace.line.dash in (None, "solid") for trace in figure.data)
+    assert list(figure.data[0].y) == [
+        record.actual_population_size for record in results.history
+    ]
+    assert list(figure.data[1].y) == [
+        record.beneficial_dominant_population_size for record in results.history
+    ]
+    assert list(figure.data[2].y) == [
+        record.harmful_dominant_population_size for record in results.history
+    ]
+    assert figure.layout.yaxis.title.text == "Population size"
+    assert figure.layout.yaxis2.title.text == "Mean fitness"
 
 
 def test_population_can_collapse_when_all_candidates_are_nonviable():

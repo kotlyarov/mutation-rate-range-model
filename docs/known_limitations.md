@@ -86,6 +86,13 @@ proportions among viable offspring; they do not refill empty carrying capacity.
 The model still does not include a separate absolute growth, resource-dependent
 recovery, crash dynamics, or experimental extinction protocol.
 
+## Trajectory categories are simplified
+
+The benefit-led and decay-led population lines use the sign of
+`B - decay_fitness_penalty * D`. This makes collapse and decay pressure visible
+in the main chart, but it is still an aggregated model classification rather
+than a measured genotype, phenotype, or experimental lineage label.
+
 ## Event-rate assumptions are simple
 
 Beneficial, harmful, and neutral events are treated as independent Poisson

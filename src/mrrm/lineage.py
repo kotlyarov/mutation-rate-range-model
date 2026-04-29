@@ -87,6 +87,8 @@ class GenerationRecord:
     mean_decay: float
     mean_robustness: float
     beneficial_adoption_fraction: float
+    beneficial_dominant_population_size: int
+    harmful_dominant_population_size: int
     harmful_fraction: float
     mixed_fraction: float
     lineage_class_count: int
@@ -552,6 +554,8 @@ def _summarize_generation(
             mean_decay=0.0,
             mean_robustness=0.0,
             beneficial_adoption_fraction=0.0,
+            beneficial_dominant_population_size=0,
+            harmful_dominant_population_size=0,
             harmful_fraction=0.0,
             mixed_fraction=0.0,
             lineage_class_count=0,
@@ -593,6 +597,16 @@ def _summarize_generation(
     beneficial_count = sum(
         lineage.count for lineage in lineages if lineage.has_beneficial
     )
+    beneficial_dominant_count = sum(
+        lineage.count
+        for lineage in lineages
+        if _benefit_decay_balance(lineage, params) > 0.0
+    )
+    harmful_dominant_count = sum(
+        lineage.count
+        for lineage in lineages
+        if _benefit_decay_balance(lineage, params) < 0.0
+    )
     harmful_count = sum(lineage.count for lineage in lineages if lineage.has_harmful)
     mixed_count = sum(
         lineage.count
@@ -613,6 +627,8 @@ def _summarize_generation(
         mean_decay=float(np.average(decay_values, weights=weights)),
         mean_robustness=float(np.average(robustness_values, weights=weights)),
         beneficial_adoption_fraction=beneficial_count / total_count,
+        beneficial_dominant_population_size=int(beneficial_dominant_count),
+        harmful_dominant_population_size=int(harmful_dominant_count),
         harmful_fraction=harmful_count / total_count,
         mixed_fraction=mixed_count / total_count,
         lineage_class_count=len(lineages),
@@ -637,6 +653,16 @@ def _summarize_generation(
         beneficial_parent_mixed_mutation_offspring=int(
             beneficial_parent_transition_counts[4]
         ),
+    )
+
+
+def _benefit_decay_balance(
+    lineage: LineageClass,
+    params: LineageParameters,
+) -> float:
+    return (
+        lineage.accumulated_benefit
+        - params.decay_fitness_penalty * lineage.accumulated_decay
     )
 
 

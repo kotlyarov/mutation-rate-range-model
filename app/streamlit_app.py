@@ -13,7 +13,7 @@ if str(SRC) not in sys.path:
 import streamlit as st
 
 from mrrm import LineageParameters, simulate_lineage_survival
-from mrrm.plotting import make_lineage_fitness_figure
+from mrrm.plotting import make_lineage_population_figure
 from mrrm.validation import ParameterValidationError
 
 
@@ -53,7 +53,10 @@ def main() -> None:
     )
     cols[4].metric("mean decay proxy", f"{outcome.final_mean_decay:.3g}")
 
-    st.plotly_chart(make_lineage_fitness_figure(results), use_container_width=True)
+    st.caption(
+        "Population counts use the left axis. Mean fitness uses the right axis."
+    )
+    st.plotly_chart(make_lineage_population_figure(results), use_container_width=True)
 
     st.subheader("Run interpretation")
     st.write(
@@ -62,6 +65,12 @@ def main() -> None:
             "effective_population_size": params.effective_population_size,
             "final_actual_population_size": outcome.final_actual_population_size,
             "final_viable_population_size": outcome.final_viable_population_size,
+            "final_benefit_led_population_size": (
+                results.history[-1].beneficial_dominant_population_size
+            ),
+            "final_decay_led_population_size": (
+                results.history[-1].harmful_dominant_population_size
+            ),
             "beneficial_survived": outcome.beneficial_survived,
             "beneficial_reached_adoption_threshold": outcome.beneficial_adopted,
             "collapsed": outcome.collapsed,
@@ -292,11 +301,29 @@ def _render_model_audit(results) -> None:
                     "performance_fitness = max(0, 1 + B - decay_fitness_penalty * D)",
                     "robustness_modifier = max(0, 1 - robustness_fitness_weight * (1 - R))",
                     "fitness = performance_fitness * robustness_modifier",
+                    "decay_pressure = decay_fitness_penalty * D",
+                    "benefit_decay_balance = B - decay_pressure",
                     "",
                     "viable = fitness >= viability_fitness_threshold and D <= lethal_decay_threshold and R >= minimum_viable_robustness",
                     "competitive_weight = 0 if not viable else class_count * fitness ** selection_strength",
                     "next_population_size = min(carrying_capacity, viable_population_size)",
                     "next class counts are sampled in proportion to competitive_weight",
+                ]
+            ),
+            language="text",
+        )
+
+        st.subheader("Trajectory classification")
+        st.code(
+            "\n".join(
+                [
+                    "mostly_beneficial = benefit_decay_balance > 0",
+                    "mostly_harmful_or_negative = benefit_decay_balance < 0",
+                    "neutral_or_exactly_balanced = benefit_decay_balance == 0",
+                    "benefit_led_population = sum(class_count for mostly_beneficial surviving classes)",
+                    "decay_led_population = sum(class_count for mostly_harmful_or_negative surviving classes)",
+                    "total_population = sum(class_count for all surviving classes)",
+                    "classification uses surviving population counts, not fractions",
                 ]
             ),
             language="text",
@@ -333,6 +360,12 @@ def _render_model_audit(results) -> None:
                 "viable_population_size": final_record.viable_population_size,
                 "viable_lineage_class_count": final_record.viable_lineage_class_count,
                 "actual_population_size": final_record.actual_population_size,
+                "benefit_led_population": (
+                    final_record.beneficial_dominant_population_size
+                ),
+                "decay_led_population": (
+                    final_record.harmful_dominant_population_size
+                ),
                 "lineage_class_count": final_record.lineage_class_count,
             }
         )
