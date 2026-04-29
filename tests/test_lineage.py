@@ -26,6 +26,11 @@ def test_lineage_history_has_generation_axis_and_finite_metrics():
     assert history["generation"].shape == (params.generations + 1,)
     assert history["generation"][0] == 0
     assert history["generation"][-1] == params.generations
+    assert history["total_lineages_evolved"][0] == 0
+    assert np.array_equal(
+        np.diff(history["total_lineages_evolved"]),
+        history["candidate_population_size"][1:],
+    )
     for values in history.values():
         assert values.shape == (params.generations + 1,)
         assert np.all(np.isfinite(values.astype(float)))
@@ -254,9 +259,15 @@ def test_population_can_collapse_when_all_candidates_are_nonviable():
 
     assert first_generation.viable_population_size == 0
     assert first_generation.actual_population_size == 0
+    assert first_generation.total_lineages_evolved == params.effective_population_size
     assert final_generation.actual_population_size == 0
+    assert final_generation.total_lineages_evolved == params.effective_population_size
     assert results.final_lineages == ()
     assert results.outcome.collapsed is True
+    assert (
+        results.outcome.final_total_lineages_evolved
+        == params.effective_population_size
+    )
 
 
 def test_lethal_decay_threshold_overrides_high_benefit():

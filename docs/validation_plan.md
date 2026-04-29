@@ -79,7 +79,8 @@ Report which parameters most affect:
 - final best lineage fitness
 - beneficial lineage survival
 - beneficial adoption fraction
-- mean decay proxy
+- total lineages evolved
+- decay-led population size, when inspecting genome-decay behaviour specifically
 - collapse / derailment frequency across repeated seeds
 
 ## Empirical validation later

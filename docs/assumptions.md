@@ -171,6 +171,13 @@ Classes with positive balance contribute to the benefit-led population line.
 Classes with negative balance contribute to the decay-led population line.
 Classes with exactly zero balance appear only in the total population count.
 
+### Total lineages evolved
+
+The top-level `total lineages evolved` metric is the cumulative number of
+offspring lineages generated before viability filtering across generation
+transitions. It includes lineages that survive and lineages that later disappear.
+The generation 0 starting population is not counted as produced during the run.
+
 ## Modelling assumptions
 
 ### Aggregated lineage classes

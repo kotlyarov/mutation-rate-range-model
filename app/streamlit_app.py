@@ -51,7 +51,10 @@ def main() -> None:
         "beneficial adoption",
         f"{outcome.final_beneficial_adoption_fraction:.1%}",
     )
-    cols[4].metric("mean decay proxy", f"{outcome.final_mean_decay:.3g}")
+    cols[4].metric(
+        "total lineages evolved",
+        f"{outcome.final_total_lineages_evolved:,}",
+    )
 
     st.caption(
         "Population counts use the left axis. Mean fitness uses the right axis."
@@ -65,6 +68,7 @@ def main() -> None:
             "effective_population_size": params.effective_population_size,
             "final_actual_population_size": outcome.final_actual_population_size,
             "final_viable_population_size": outcome.final_viable_population_size,
+            "total_lineages_evolved": outcome.final_total_lineages_evolved,
             "final_benefit_led_population_size": (
                 results.history[-1].beneficial_dominant_population_size
             ),
@@ -303,6 +307,7 @@ def _render_model_audit(results) -> None:
                     "fitness = performance_fitness * robustness_modifier",
                     "decay_pressure = decay_fitness_penalty * D",
                     "benefit_decay_balance = B - decay_pressure",
+                    "total_lineages_evolved_next = total_lineages_evolved_prior + candidate_population_size",
                     "",
                     "viable = fitness >= viability_fitness_threshold and D <= lethal_decay_threshold and R >= minimum_viable_robustness",
                     "competitive_weight = 0 if not viable else class_count * fitness ** selection_strength",
@@ -349,6 +354,20 @@ def _render_model_audit(results) -> None:
             language="text",
         )
 
+        st.subheader("Lineage-production accounting")
+        st.code(
+            "\n".join(
+                [
+                    "generation_0_total_lineages_evolved = 0",
+                    "candidate_population_size = number of offspring lineages generated before viability filtering",
+                    "total_lineages_evolved = cumulative sum(candidate_population_size over generation transitions)",
+                    "the count includes offspring lineages that survive and offspring lineages later lost to selection, extinction, or nonviability",
+                    "starting lineages at generation 0 are not counted as produced during the run",
+                ]
+            ),
+            language="text",
+        )
+
         st.subheader("Current transition probabilities")
         st.write(results.transition_probabilities.as_dict())
 
@@ -357,6 +376,7 @@ def _render_model_audit(results) -> None:
             {
                 "carrying_capacity": final_record.carrying_capacity,
                 "candidate_population_size": final_record.candidate_population_size,
+                "total_lineages_evolved": final_record.total_lineages_evolved,
                 "viable_population_size": final_record.viable_population_size,
                 "viable_lineage_class_count": final_record.viable_lineage_class_count,
                 "actual_population_size": final_record.actual_population_size,

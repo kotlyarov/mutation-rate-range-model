@@ -221,6 +221,24 @@ are nonviable, the actual population size becomes zero and the run is collapsed.
 This is stochastic lineage-class sampling, not a deterministic post-processing
 weight over mutation-rate bins.
 
+## Lineage-production accounting
+
+The model reports a cumulative experiment-scale count:
+
+```text
+generation_0_total_lineages_evolved = 0
+
+candidate_population_size_t =
+  number of offspring lineages generated before viability filtering at generation t
+
+total_lineages_evolved_t =
+  sum(candidate_population_size_1 ... candidate_population_size_t)
+```
+
+This includes offspring lineages that survive and offspring lineages later lost
+to selection, extinction, or nonviability. Starting lineages at generation 0 are
+not counted as produced during the run.
+
 ## Trajectory classification
 
 The population trajectory chart classifies surviving lineage classes by their
@@ -272,7 +290,7 @@ final actual population size
 carrying capacity
 viable candidate population size
 final beneficial adoption fraction
-final mean decay proxy
+total lineages evolved
 whether any beneficial lineage survived
 whether beneficial adoption crossed the configured threshold
 whether mean fitness crossed the configured collapse threshold or population collapsed
@@ -304,7 +322,8 @@ The sweep should compare:
 - final mean fitness
 - best surviving lineage fitness
 - beneficial lineage survival and adoption
-- mean decay proxy
+- total lineages evolved
+- decay-led population size
 - collapse or derailment frequency across repeated seeds
 
 Only then should the project estimate an assumption-dependent mutation-rate

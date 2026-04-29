@@ -78,6 +78,7 @@ class GenerationRecord:
     carrying_capacity: int
     actual_population_size: int
     candidate_population_size: int
+    total_lineages_evolved: int
     viable_population_size: int
     viable_lineage_class_count: int
     mean_fitness: float
@@ -123,6 +124,7 @@ class LineageOutcomeSummary:
     carrying_capacity: int
     final_actual_population_size: int
     final_viable_population_size: int
+    final_total_lineages_evolved: int
     final_mean_fitness: float
     final_best_fitness: float
     final_dominant_fitness: float
@@ -223,10 +225,12 @@ def simulate_lineage_survival(
             zero_counts,
             0,
             initial_selection,
+            0,
             params,
         )
     ]
 
+    total_lineages_evolved = 0
     for generation in range(1, params.generations + 1):
         (
             candidates,
@@ -240,6 +244,7 @@ def simulate_lineage_survival(
             rng,
         )
         lineages, selection = _select_survivors(candidates, params, rng)
+        total_lineages_evolved += selection.candidate_population_size
         lineages = _merge_lineage_overflow(lineages, params)
         history.append(
             _summarize_generation(
@@ -249,6 +254,7 @@ def simulate_lineage_survival(
                 beneficial_parent_transition_counts,
                 beneficial_parent_population_size,
                 selection,
+                total_lineages_evolved,
                 params,
             )
         )
@@ -536,6 +542,7 @@ def _summarize_generation(
     beneficial_parent_transition_counts: np.ndarray,
     beneficial_parent_population_size: int,
     selection: SelectionSummary,
+    total_lineages_evolved: int,
     params: LineageParameters,
 ) -> GenerationRecord:
     total_count = int(sum(lineage.count for lineage in lineages))
@@ -545,6 +552,7 @@ def _summarize_generation(
             carrying_capacity=int(params.effective_population_size),
             actual_population_size=0,
             candidate_population_size=selection.candidate_population_size,
+            total_lineages_evolved=int(total_lineages_evolved),
             viable_population_size=selection.viable_population_size,
             viable_lineage_class_count=selection.viable_lineage_class_count,
             mean_fitness=0.0,
@@ -618,6 +626,7 @@ def _summarize_generation(
         carrying_capacity=int(params.effective_population_size),
         actual_population_size=total_count,
         candidate_population_size=selection.candidate_population_size,
+        total_lineages_evolved=int(total_lineages_evolved),
         viable_population_size=selection.viable_population_size,
         viable_lineage_class_count=selection.viable_lineage_class_count,
         mean_fitness=float(np.average(fitness_values, weights=weights)),
@@ -684,6 +693,7 @@ def _summarize_outcome(
         carrying_capacity=final_record.carrying_capacity,
         final_actual_population_size=final_record.actual_population_size,
         final_viable_population_size=final_record.viable_population_size,
+        final_total_lineages_evolved=final_record.total_lineages_evolved,
         final_mean_fitness=final_record.mean_fitness,
         final_best_fitness=final_record.best_fitness,
         final_dominant_fitness=final_record.dominant_fitness,
