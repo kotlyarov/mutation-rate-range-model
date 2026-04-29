@@ -162,7 +162,7 @@ The local GUI allows the user to:
 - set effective population size and generation horizon
 - adjust mutation supply, benefit, decay, robustness, and survival parameters
 - observe total population size, benefit-led population size, decay-led population size, and mean fitness by generation
-- see total lineages evolved, including lineages later lost to extinction or nonviability
+- see total mutated lineages evolved, including mutation-bearing lineages later lost to extinction or nonviability
 - inspect generation history and final surviving lineage classes
 - inspect the collapsed model audit for formulas, trajectory classification, lineage-production accounting, probabilities, population-cap logic, hidden simulation controls, thresholds, and input provenance
 

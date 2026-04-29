@@ -228,16 +228,21 @@ The model reports a cumulative experiment-scale count:
 ```text
 generation_0_total_lineages_evolved = 0
 
-candidate_population_size_t =
-  number of offspring lineages generated before viability filtering at generation t
+new_mutation_lineages_t =
+  neutral_mutation_offspring_t
+  + harmful_mutation_offspring_t
+  + beneficial_mutation_offspring_t
+  + mixed_mutation_offspring_t
 
 total_lineages_evolved_t =
-  sum(candidate_population_size_1 ... candidate_population_size_t)
+  sum(new_mutation_lineages_1 ... new_mutation_lineages_t)
 ```
 
-This includes offspring lineages that survive and offspring lineages later lost
-to selection, extinction, or nonviability. Starting lineages at generation 0 are
-not counted as produced during the run.
+No-mutation offspring continue an existing lineage and are not counted as new
+evolved lineages. The metric includes mutated offspring lineages that survive
+and mutated offspring lineages later lost to selection, extinction, or
+nonviability. Starting lineages at generation 0 are not counted as produced
+during the run.
 
 ## Trajectory classification
 

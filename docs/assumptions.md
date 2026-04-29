@@ -174,9 +174,11 @@ Classes with exactly zero balance appear only in the total population count.
 ### Total lineages evolved
 
 The top-level `total lineages evolved` metric is the cumulative number of
-offspring lineages generated before viability filtering across generation
-transitions. It includes lineages that survive and lineages that later disappear.
-The generation 0 starting population is not counted as produced during the run.
+mutation-bearing offspring lineages generated before viability filtering across
+generation transitions. No-mutation offspring continue an existing lineage and
+are not counted as new evolved lineages. The metric includes mutated lineages
+that survive and mutated lineages that later disappear. The generation 0
+starting population is not counted as produced during the run.
 
 ## Modelling assumptions
 

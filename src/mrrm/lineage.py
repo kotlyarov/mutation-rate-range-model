@@ -244,7 +244,7 @@ def simulate_lineage_survival(
             rng,
         )
         lineages, selection = _select_survivors(candidates, params, rng)
-        total_lineages_evolved += selection.candidate_population_size
+        total_lineages_evolved += _new_mutation_lineage_count(transition_counts)
         lineages = _merge_lineage_overflow(lineages, params)
         history.append(
             _summarize_generation(
@@ -354,6 +354,10 @@ def _apply_transition(
         has_beneficial=lineage.has_beneficial or adds_beneficial,
         has_harmful=lineage.has_harmful or adds_harmful,
     )
+
+
+def _new_mutation_lineage_count(transition_counts: np.ndarray) -> int:
+    return int(np.sum(transition_counts[1:]))
 
 
 def _benefit_after_new_mutation(

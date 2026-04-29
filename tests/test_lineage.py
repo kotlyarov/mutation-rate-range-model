@@ -27,9 +27,15 @@ def test_lineage_history_has_generation_axis_and_finite_metrics():
     assert history["generation"][0] == 0
     assert history["generation"][-1] == params.generations
     assert history["total_lineages_evolved"][0] == 0
+    new_mutation_lineages = (
+        history["neutral_mutation_offspring"]
+        + history["harmful_mutation_offspring"]
+        + history["beneficial_mutation_offspring"]
+        + history["mixed_mutation_offspring"]
+    )
     assert np.array_equal(
         np.diff(history["total_lineages_evolved"]),
-        history["candidate_population_size"][1:],
+        new_mutation_lineages[1:],
     )
     for values in history.values():
         assert values.shape == (params.generations + 1,)
@@ -55,6 +61,26 @@ def test_transition_probabilities_are_valid_and_sum_to_one():
     assert np.all(probabilities >= 0)
     assert np.all(probabilities <= 1)
     assert np.isclose(np.sum(probabilities), 1.0)
+
+
+def test_no_mutation_offspring_do_not_count_as_new_lineages():
+    params = LineageParameters(
+        generations=5,
+        effective_population_size=100,
+        mutation_rate_multiplier=1.0,
+        beneficial_mutation_rate=0.0,
+        neutral_mutation_rate=0.0,
+        deleterious_mutation_rate=0.0,
+        random_seed=14,
+    )
+    results = simulate_lineage_survival(params)
+
+    assert all(
+        record.no_mutation_offspring == params.effective_population_size
+        for record in results.history[1:]
+    )
+    assert all(record.total_lineages_evolved == 0 for record in results.history)
+    assert results.outcome.final_total_lineages_evolved == 0
 
 
 def test_accumulated_state_carries_forward_across_generations():

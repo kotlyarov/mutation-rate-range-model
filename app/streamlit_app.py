@@ -13,6 +13,7 @@ if str(SRC) not in sys.path:
 import streamlit as st
 
 from mrrm import LineageParameters, simulate_lineage_survival
+from mrrm.formatting import format_count_compact
 from mrrm.plotting import make_lineage_population_figure
 from mrrm.validation import ParameterValidationError
 
@@ -42,8 +43,8 @@ def main() -> None:
     cols = st.columns(5)
     cols[0].metric(
         "final population",
-        f"{outcome.final_actual_population_size:,}",
-        f"cap {outcome.carrying_capacity:,}",
+        format_count_compact(outcome.final_actual_population_size),
+        f"cap {format_count_compact(outcome.carrying_capacity)}",
     )
     cols[1].metric("final mean fitness", f"{outcome.final_mean_fitness:.3g}")
     cols[2].metric("best lineage fitness", f"{outcome.final_best_fitness:.3g}")
@@ -53,7 +54,7 @@ def main() -> None:
     )
     cols[4].metric(
         "total lineages evolved",
-        f"{outcome.final_total_lineages_evolved:,}",
+        format_count_compact(outcome.final_total_lineages_evolved),
     )
 
     st.caption(
@@ -307,7 +308,8 @@ def _render_model_audit(results) -> None:
                     "fitness = performance_fitness * robustness_modifier",
                     "decay_pressure = decay_fitness_penalty * D",
                     "benefit_decay_balance = B - decay_pressure",
-                    "total_lineages_evolved_next = total_lineages_evolved_prior + candidate_population_size",
+                    "new_mutation_lineages = neutral + harmful + beneficial + mixed offspring",
+                    "total_lineages_evolved_next = total_lineages_evolved_prior + new_mutation_lineages",
                     "",
                     "viable = fitness >= viability_fitness_threshold and D <= lethal_decay_threshold and R >= minimum_viable_robustness",
                     "competitive_weight = 0 if not viable else class_count * fitness ** selection_strength",
@@ -359,9 +361,10 @@ def _render_model_audit(results) -> None:
             "\n".join(
                 [
                     "generation_0_total_lineages_evolved = 0",
-                    "candidate_population_size = number of offspring lineages generated before viability filtering",
-                    "total_lineages_evolved = cumulative sum(candidate_population_size over generation transitions)",
-                    "the count includes offspring lineages that survive and offspring lineages later lost to selection, extinction, or nonviability",
+                    "no_mutation_offspring continue an existing lineage and are not counted as new evolved lineages",
+                    "new_mutation_lineages = neutral_mutation_offspring + harmful_mutation_offspring + beneficial_mutation_offspring + mixed_mutation_offspring",
+                    "total_lineages_evolved = cumulative sum(new_mutation_lineages over generation transitions)",
+                    "the count includes mutated offspring lineages that survive and mutated offspring lineages later lost to selection, extinction, or nonviability",
                     "starting lineages at generation 0 are not counted as produced during the run",
                 ]
             ),
