@@ -1,396 +1,254 @@
 # Model Specification
 
-This document defines the first deterministic version of the Mutation Rate Range Model.
+This document defines the current high-level Mutation Rate Range Model.
 
 ## Scope
 
-The first version is a deterministic curve model. It should be simple, inspectable, and easy to test.
+The primary model is now a generational lineage-survival model. A single run
+fixes one mutation-rate multiplier and asks whether beneficial lineages survive
+and spread before harmful mutation accumulation and genome-decay proxy effects
+derail them.
+
+The model remains exploratory and transparent. It should not be interpreted as a
+validated population-genetic simulator.
 
 It should not include:
 
-- stochastic Wright-Fisher simulation
 - Approximate Bayesian Computation
 - Bayesian hierarchical fitting
-- real-data parameter inference
+- database or cloud integrations
 - automatic scientific claims
+- hidden parameter fitting
 
-Those may be added later.
+Those may be added only after explicit design and validation work.
 
-## Inputs
+## Core inputs
 
-The core inputs are:
-
-```text
-m = mutation-rate multiplier relative to wild type
-T = number of generations
-```
-
-The model evaluates a vector of mutation-rate multipliers:
+The main single-run inputs are:
 
 ```text
-m_values = [m_min, ..., m_max]
+mutation_rate_multiplier = mutation-rate multiplier relative to wild type
+population_size = number of surviving lineages sampled each generation
+generations = generation horizon
 ```
 
-Example default range:
+Additional transparent assumptions control mutation supply, inherited effects,
+interference, and survival selection:
 
 ```text
-m_min = 0.1
-m_max = 100.0
-n_points = 400
+T_ref = reference horizon used to scale per-generation event rates
+alpha_benefit = beneficial event-rate scale
+neutral_rate_scale = neutral event-rate scale
+decay_scale = harmful / decay event-rate scale
+gamma_decay = nonlinearity for harmful / decay event supply
+beneficial_effect_size = benefit increment from one beneficial event before interference
+decay_effect_size = decay-proxy increment from one harmful event
+benefit_scale = saturation ceiling for accumulated selected-environment benefit
+beta_interference, gamma_interference = interference parameters
+lambda_decay = fitness penalty weight for accumulated decay proxy
+rho_robustness = fitness penalty/reward weight for retained robustness
+selection_strength = strength of fitness-weighted survival
+random_seed = seed for reproducible stochastic runs
 ```
 
-Use log-spaced mutation-rate values by default because the biologically interesting range may span orders of magnitude.
+## Lineage state
 
-## Core outputs
-
-The first model computes:
+Each surviving lineage class carries inherited biological state:
 
 ```text
-B(m, T) = selected-environment adaptive benefit
-D(m, T) = mutation-accumulation / genome-decay proxy
-R(m, T) = retained robustness
-S(m, T) = net long-term score
+count
+accumulated_benefit
+accumulated_decay
+robustness
+fitness
+has_beneficial
+has_harmful
 ```
 
-The net score is:
+This state is not reset between generations. The same generation-transition
+rules are reapplied to the surviving classes.
+
+The core biological quantities remain conceptually separated:
 
 ```text
-S(m, T) = B(m, T) - lambda_decay * D(m, T) + rho_robustness * R(m, T)
+B = accumulated selected-environment adaptive benefit
+D = accumulated mutation-accumulation / genome-decay proxy
+R = retained robustness
+fitness = survival-relevant relative fitness
 ```
 
-Where:
+`D` remains a proxy. It is not a literal measurement of every harmful mutation.
+
+## One-generation mutation rules
+
+For one generation, event probabilities are derived from independent Poisson
+arrival assumptions:
 
 ```text
-lambda_decay = penalty weight for mutation accumulation / genome decay
-rho_robustness = reward weight for retained robustness
+r_b = alpha_benefit * mutation_rate_multiplier / T_ref
+r_h = decay_scale * mutation_rate_multiplier^gamma_decay / T_ref
+r_n = neutral_rate_scale * mutation_rate_multiplier / T_ref
+
+p_b = 1 - exp(-r_b)
+p_h = 1 - exp(-r_h)
+p_n = 1 - exp(-r_n)
 ```
 
-The optional Survival Selection block converts `S(m, T)` into expected
-survival contributions before threshold estimates are calculated. When this
-block is disabled, thresholds use the raw deterministic curves above.
-
-## Interpretation of terms
-
-### Adaptive benefit: `B(m, T)`
-
-`B` represents selected-environment fitness gain.
-
-It should generally:
-
-- be non-negative
-- increase with generation horizon
-- increase with mutation rate at low-to-moderate mutation rates
-- saturate or decline at high mutation rates if deleterious interference is included
-
-A simple first form:
+Offspring from each lineage class are stochastically split into high-level
+mutation classes:
 
 ```text
-beneficial_supply(m) = 1 - exp(-alpha_benefit * m * T_scaled)
-interference(m) = 1 / (1 + beta_interference * m^gamma_interference)
-
-B(m, T) = benefit_scale * beneficial_supply(m) * interference(m)
+no_new_mutation = (1 - p_b) * (1 - p_h) * (1 - p_n)
+neutral = (1 - p_b) * (1 - p_h) * p_n
+harmful = (1 - p_b) * p_h
+beneficial = p_b * (1 - p_h)
+mixed = p_b * p_h
 ```
 
-Where:
+The simulator samples integer counts from these probabilities. This means tiny
+expected probabilities do not automatically create fractional impossible
+lineages. For example, if the population has 1,000,000 individuals and a class
+has expected count far below one, that class usually does not exist unless the
+stochastic draw creates it.
+
+## State update rules
+
+For a no-new-mutation or neutral offspring class:
 
 ```text
-T_scaled = T / T_ref
+B_next = B_inherited
+D_next = D_inherited
 ```
 
-### Decay proxy: `D(m, T)`
-
-`D` represents a scalar proxy for mutation accumulation, deleterious load, and inferred genome-integrity loss.
-
-It should generally:
-
-- be non-negative
-- increase with mutation rate
-- increase with generation horizon
-- be allowed to accelerate at high mutation rates
-
-A simple first form:
+For a harmful offspring class:
 
 ```text
-D(m, T) = decay_scale * (m^gamma_decay) * T_scaled
+D_next = D_inherited + decay_effect_size
+B_next = B_inherited
 ```
 
-Important: `D` is not a literal count of harmful mutations. It is a modelling proxy.
-
-### Robustness: `R(m, T)`
-
-`R` represents retained robustness in alternative or future environments.
-
-It should generally:
-
-- be bounded between 0 and 1
-- decline as mutation accumulation increases
-- remain interpretable as a relative score, not a direct measurement
-
-A simple first form:
+For a beneficial offspring class:
 
 ```text
-R(m, T) = exp(-k_robustness * D(m, T))
+interference =
+  1 / (1 + beta_interference * interference_load^gamma_interference)
+
+benefit_increment =
+  min(benefit_scale - B_inherited, beneficial_effect_size * interference)
+
+B_next = B_inherited + benefit_increment
+D_next = D_inherited
 ```
 
-## Net score
-
-The net score combines the three outputs:
+For a mixed beneficial-plus-harmful offspring class, the harmful decay increment
+is applied and the beneficial increment is reduced by interference from both the
+inherited decay and the newly acquired harmful increment:
 
 ```text
-S(m, T) = B(m, T) - lambda_decay * D(m, T) + rho_robustness * R(m, T)
+interference_load = D_inherited + decay_effect_size
 ```
 
-This score is not biological truth. It is an assumption-dependent utility score for exploring trade-offs.
-
-## Survival Selection
-
-Survival Selection is an optional expected viability-selection layer. It is
-intended to represent constrained survival or replacement competition after
-mutation and fitness scoring:
+After updating `B` and `D`:
 
 ```text
-mutation creates variants
-fitness/net score scores variants
-survival filtering changes which mutation-rate classes contribute to thresholds
+R_next = exp(-k_robustness * D_next)
+
+fitness_next =
+  max(0, 1 + B_next - lambda_decay * D_next + rho_robustness * (R_next - 1))
 ```
 
-It must remain a simple deterministic expectation, not an individual-based
-simulation. Selection is applied recursively across the model horizon, not as a
-final multiplier on completed curves:
+The `rho_robustness * (R - 1)` term makes the starting generation fitness equal
+to 1.0 and treats robustness loss as a conditional fitness penalty rather than
+an unconditional bonus.
+
+## Survival selection
+
+After mutation creates candidate offspring classes, survival selection samples
+the next generation. The population size is fixed by resampling exactly
+`population_size` survivors.
+
+For candidate class `i`:
 
 ```text
-effective_selection_strength = selection_strength / population_growth_factor
-G = round(T)
-p_i(0) = 1 / n_points
+survival_weight_i =
+  candidate_count_i * max(fitness_i, minimum_survival_fitness)^selection_strength
 
-for generation g in 1..G:
-  compute B_i(g), D_i(g), R_i(g), and S_i(g)
-
-  relative_fitness_i(g) =
-    exp(effective_selection_strength * (S_i(g) - max(S(g))))
-
-  fitness_weighted_survival_i(g) =
-    p_i(g - 1) * relative_fitness_i(g)
-    / sum_j(p_j(g - 1) * relative_fitness_j(g))
-
-  p_i(g) =
-    (1 - survival_stochasticity) * fitness_weighted_survival_i(g)
-    + survival_stochasticity * p_i(g - 1)
-
-  contribution_weight_i(g) = p_i(g) / (1 / n_points)
+survival_probability_i =
+  survival_weight_i / sum_j(survival_weight_j)
 ```
 
-Interpretation:
+The next generation's class counts are sampled from a multinomial distribution
+with these survival probabilities. A class can disappear if its sampled survivor
+count is zero. Surviving classes seed the next generation with their accumulated
+state intact.
 
-- `population_growth_factor = 1.0` represents stable effective population size / replacement competition.
-- `population_growth_factor > 1.0` weakens effective selection pressure.
-- `population_growth_factor < 1.0` strengthens bottleneck-like selection pressure.
-- `selection_strength` controls how strongly net-score differences affect survival probabilities.
-- `survival_stochasticity = 0.0` gives fully fitness-weighted expected survival.
-- `survival_stochasticity = 1.0` gives neutral expected survival.
-- `survival_stochasticity = 0.23` is the default proxy, based on the closest
-  experimental drift measurement found: LTEE ancestor descendant-number
-  variance around 1.3, mapped as excess variance `(1.3 - 1) / 1.3`.
+This is stochastic lineage-class sampling, not a deterministic post-processing
+weight over mutation-rate bins.
 
-The post-selection landscape used by threshold estimation is:
+## Main outputs
+
+The main chart uses:
 
 ```text
-B_surv_i = sum_g((B_i(g) - B_i(g - 1)) * contribution_weight_i(g))
-D_surv_i = sum_g((D_i(g) - D_i(g - 1)) * contribution_weight_i(g))
-R_surv_i = exp(-k_robustness * D_surv_i)
-S_surv_i = B_surv_i - lambda_decay * D_surv_i + rho_robustness * R_surv_i
+X axis = generation
+Y axis = relative fitness
 ```
 
-The disabled and fully neutral cases preserve the raw deterministic curves. With
-selection enabled, low-fitness mutation-rate bins are progressively
-underrepresented and high-fitness bins are progressively overrepresented across
-the generation loop.
+It should show:
 
-## Derived range estimates
+- starting generation
+- mean population fitness
+- best surviving lineage fitness
+- dominant lineage fitness
+- beneficial adoption fraction over time
 
-The model should estimate:
+The run also reports:
 
 ```text
-mu_peak = m where the threshold score landscape is maximal
-mu_min = lower edge of the contiguous acceptable chart region containing mu_peak
-mu_max = upper edge of the contiguous acceptable chart region containing mu_peak
+final mean fitness
+final best lineage fitness
+final dominant lineage fitness
+final beneficial adoption fraction
+final mean decay proxy
+whether any beneficial lineage survived
+whether beneficial adoption crossed the configured threshold
+whether mean fitness crossed the configured collapse threshold
 ```
 
-Suggested default rules:
+All outputs must be described as conditional on the selected assumptions.
+
+## Static curve helpers
+
+The older deterministic mutation-rate landscape helpers are retained for
+calibration context and future mutation-rate sweeps:
 
 ```text
-benefit_threshold_fraction = 0.80
-decay_threshold_fraction = 0.80
-net_threshold_fraction = 0.80
+B(m, T) = selected-environment adaptive benefit curve
+D(m, T) = mutation-accumulation / genome-decay proxy curve
+R(m, T) = retained robustness curve
+S(m, T) = net long-term score curve
 ```
 
-Possible definitions:
+They should not be used as the primary survival mechanism. Survival is now
+modelled generation by generation in the lineage model.
+
+## Later mutation-rate sweep
+
+After the single-run lineage model is working, a mutation-rate sweep should run
+the same generational model repeatedly across mutation-rate multiplier values.
+The sweep should compare:
+
+- final mean fitness
+- best surviving lineage fitness
+- beneficial lineage survival and adoption
+- mean decay proxy
+- collapse or derailment frequency across repeated seeds
+
+Only then should the project estimate an assumption-dependent mutation-rate
+range from lineage-survival outcomes. The wording must remain conditional, for
+example:
 
 ```text
-mu_peak = m at max(S_threshold)
-
-lower_acceptable(m) is true where:
-  B_threshold(m, T) >= benefit_threshold_fraction * max(B_threshold)
-  and S_threshold(m, T) >= net_threshold_fraction * max(S_threshold)
-
-upper_acceptable(m) is true where:
-  S_threshold(m, T) >= net_threshold_fraction * max(S_threshold)
-  and D_threshold(m, T) <= max(
-    decay_threshold_fraction * max(D_threshold),
-    D_threshold(mu_peak)
-  )
-
-mu_min = lowest m in the contiguous lower_acceptable region ending at mu_peak
-mu_max = highest m in the contiguous upper_acceptable region starting at mu_peak
-```
-
-These rules must be configurable and clearly labelled. `mu_min`, `mu_peak`, and
-`mu_max` must be calculated from the same `B_threshold`, `D_threshold`, and
-`S_threshold` arrays plotted in the chart. The peak must always lie inside the
-reported interval, and disconnected acceptable regions away from the plotted
-peak must not extend the reported range.
-
-When Survival Selection is disabled:
-
-```text
-B_threshold = B
-D_threshold = D
-S_threshold = S
-```
-
-When Survival Selection is enabled:
-
-```text
-B_threshold = B_surv
-D_threshold = D_surv
-S_threshold = S_surv
-```
-
-## Default parameter object
-
-Suggested first parameter object:
-
-```text
-T = 50000
-T_ref = 50000
-
-m_min = 0.1
-m_max = 100.0
-n_points = 400
-
-benefit_scale = 1.0
-alpha_benefit = 1.0
-beta_interference = 0.01
-gamma_interference = 1.0
-
-decay_scale = 1.0
-gamma_decay = 1.2
-
-k_robustness = 0.05
-
-lambda_decay = 0.2
-rho_robustness = 0.1
-
-survival_selection_enabled = True
-population_growth_factor = 1.0
-selection_strength = 1.0
-survival_stochasticity = 0.23
-
-benefit_threshold_fraction = 0.80
-net_threshold_fraction = 0.80
-decay_threshold_fraction = 0.80
-```
-
-These defaults are placeholders for exploration. They must not be presented as fitted biological values.
-
-## Required functions
-
-Implement pure functions similar to:
-
-```python
-def make_m_values(params) -> np.ndarray:
-    ...
-
-def adaptive_benefit(m_values: np.ndarray, params) -> np.ndarray:
-    ...
-
-def decay_proxy(m_values: np.ndarray, params) -> np.ndarray:
-    ...
-
-def robustness(m_values: np.ndarray, decay_values: np.ndarray, params) -> np.ndarray:
-    ...
-
-def net_score(
-    benefit_values: np.ndarray,
-    decay_values: np.ndarray,
-    robustness_values: np.ndarray,
-    params,
-) -> np.ndarray:
-    ...
-
-def survival_selection(
-    m_values: np.ndarray,
-    benefit_values: np.ndarray,
-    decay_values: np.ndarray,
-    robustness_values: np.ndarray,
-    score_values: np.ndarray,
-    params,
-):
-    ...
-
-def estimate_range(
-    m_values: np.ndarray,
-    benefit_values: np.ndarray,
-    decay_values: np.ndarray,
-    robustness_values: np.ndarray,
-    score_values: np.ndarray,
-    params,
-) -> dict:
-    ...
-```
-
-## Validation rules
-
-For valid inputs:
-
-- all output arrays must match the shape of `m_values`
-- no output should contain NaN or infinity
-- `B` must be non-negative
-- `D` must be non-negative
-- `R` must be between 0 and 1
-- survival probabilities must be finite, positive, and sum to 1
-- `mu_peak` must be one of the evaluated `m_values`
-- invalid parameters must raise clear exceptions
-
-## GUI behaviour
-
-The GUI should show:
-
-- adaptive benefit curve
-- decay proxy curve
-- robustness curve
-- net-score curve
-- selected parameter values
-- estimated `mu_min`, `mu_peak`, and `mu_max`
-- warning that outputs are assumption-dependent
-
-The GUI must not say that the model has discovered the true optimal mutation rate.
-
-## Output language
-
-Use cautious language:
-
-```text
-Under current assumptions...
-The model estimates...
-The score peaks near...
-The result is sensitive to...
-```
-
-Avoid:
-
-```text
-The optimal mutation rate is...
-Evolution chooses...
-This proves...
+Under the selected assumptions, repeated lineage runs suggest a high-performing
+mutation-rate multiplier region near X.
 ```

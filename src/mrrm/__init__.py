@@ -1,4 +1,4 @@
-"""First deterministic version of the Mutation Rate Range Model."""
+"""Mutation Rate Range Model package."""
 
 from .audit import (
     CalibrationAudit,
@@ -28,14 +28,29 @@ from .curves import (
     robustness,
     survival_selection,
 )
-from .parameters import ModelParameters
+from .lineage import (
+    GenerationRecord,
+    LineageClass,
+    LineageOutcomeSummary,
+    LineageSimulationResult,
+    MutationTransitionProbabilities,
+    mutation_transition_probabilities,
+    simulate_lineage_survival,
+)
+from .parameters import LineageParameters, ModelParameters
 
 __all__ = [
     "CalibrationAudit",
     "CalibrationAuditFit",
     "CalibrationResult",
+    "GenerationRecord",
+    "LineageClass",
+    "LineageOutcomeSummary",
+    "LineageParameters",
+    "LineageSimulationResult",
     "ModelParameters",
     "ModelResults",
+    "MutationTransitionProbabilities",
     "ParameterEstimate",
     "RangeEstimate",
     "SurvivalSelectionResult",
@@ -50,8 +65,10 @@ __all__ = [
     "estimate_range",
     "evaluate_model",
     "make_m_values",
+    "mutation_transition_probabilities",
     "net_score",
     "robustness",
     "select_calibration_observations",
+    "simulate_lineage_survival",
     "survival_selection",
 ]

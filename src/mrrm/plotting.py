@@ -1,10 +1,11 @@
-"""Plotting helpers for deterministic model results and raw observations."""
+"""Plotting helpers for model results and raw observations."""
 
 from __future__ import annotations
 
 import plotly.graph_objects as go
 
 from .curves import ModelResults
+from .lineage import LineageSimulationResult
 
 
 def make_raw_observation_figure(observations: list[dict]) -> go.Figure:
@@ -168,6 +169,63 @@ def make_curve_figure(results: ModelResults) -> go.Figure:
             "visible": results.survival_selection.enabled,
         },
         legend_title="Curve",
+        template="plotly_white",
+        margin={"l": 48, "r": 24, "t": 56, "b": 48},
+    )
+    return fig
+
+
+def make_lineage_fitness_figure(results: LineageSimulationResult) -> go.Figure:
+    """Create a Plotly figure for generational lineage survival."""
+
+    history = results.history_arrays()
+    fig = go.Figure()
+    fig.add_scatter(
+        x=history["generation"],
+        y=history["mean_fitness"],
+        mode="lines",
+        name="mean population fitness",
+    )
+    fig.add_scatter(
+        x=history["generation"],
+        y=history["best_fitness"],
+        mode="lines",
+        name="best surviving lineage fitness",
+        line={"dash": "dash"},
+    )
+    fig.add_scatter(
+        x=history["generation"],
+        y=history["dominant_fitness"],
+        mode="lines",
+        name="dominant lineage fitness",
+        line={"dash": "dot"},
+    )
+    fig.add_scatter(
+        x=history["generation"],
+        y=history["beneficial_adoption_fraction"],
+        mode="lines",
+        name="beneficial adoption fraction",
+        yaxis="y2",
+    )
+    fig.add_vline(
+        x=0,
+        line_width=1,
+        line_dash="dot",
+        annotation_text="start",
+        annotation_position="top left",
+    )
+    fig.update_layout(
+        title="Generational lineage-survival trajectory",
+        xaxis_title="Generation",
+        yaxis_title="Relative fitness",
+        yaxis2={
+            "title": "Beneficial adoption fraction",
+            "overlaying": "y",
+            "side": "right",
+            "range": [0, 1],
+            "showgrid": False,
+        },
+        legend_title="Trajectory",
         template="plotly_white",
         margin={"l": 48, "r": 24, "t": 56, "b": 48},
     )

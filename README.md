@@ -8,12 +8,12 @@ The project is inspired by the Long-Term Evolution Experiment (LTEE), mutator ge
 
 This repository now contains:
 
-- a first deterministic curve-based model
-- a local Streamlit GUI for inspecting model behaviour
+- a generational lineage-survival model
+- retained deterministic curve helpers for calibration context and later sweeps
+- a local Streamlit GUI for inspecting one lineage run
 - parameter validation and tests
 - plotting helpers
 - an experimental-data scaffold for curated observations
-- an experimental-data inventory section in the app
 
 The project is **not calibrated yet**. The included experimental-data files are currently a schema/pipeline foundation, not final fitted biological data.
 
@@ -43,18 +43,22 @@ The app may print a warning about `urllib3`, LibreSSL, or Streamlit's `use_conta
 
 The goal is not to calculate the exact fitness effect of every possible genomic change. That is not currently realistic.
 
-Instead, this project estimates empirical curves:
+Instead, this project follows aggregated lineage classes generation by generation:
 
-- mutation rate -> selected-environment fitness gain
-- mutation rate -> mutation accumulation / genome-decay proxy
-- mutation rate -> retained robustness in alternative environments
-- mutation rate -> net long-term score
+- one run fixes a mutation-rate multiplier
+- each generation samples no-new, neutral, harmful, beneficial, and mixed offspring classes
+- accumulated benefit, decay proxy, robustness, and fitness carry forward
+- stochastic survival selection determines which classes seed the next generation
 
-The model should eventually identify an approximate range:
+The current main question is:
 
-- `mu_min`: mutation-rate multiplier below which adaptation is too slow
-- `mu_peak`: mutation-rate multiplier with the highest net score
-- `mu_max`: mutation-rate multiplier above which mutation accumulation, deleterious load, or robustness loss dominates
+```text
+Will beneficial lineages survive and spread before being derailed by harmful mutations / genome decay?
+```
+
+A later mutation-rate sweep should run the same lineage model repeatedly across
+mutation-rate multipliers and random seeds before estimating an approximate
+assumption-dependent range.
 
 Mutation rate is represented as a multiplier relative to a wild-type *E. coli* baseline.
 
@@ -76,7 +80,7 @@ This project is:
 
 - a transparent modelling tool
 - a local GUI for exploring assumptions
-- a curve-based approximation with uncertainty bands
+- a high-level stochastic lineage-survival approximation
 - a reproducible Python codebase
 - a place to curate experimental observations
 - a way to test sensitivity of conclusions to uncertain parameters
@@ -92,31 +96,30 @@ This project is not:
 - a claim that "good" and "bad" mutations are absolute categories
 - a replacement for experimental biology
 
-## First model version
+## Current model version
 
-The first version uses deterministic curves:
-
-```text
-B(m, T) = selected-environment adaptive benefit
-D(m, T) = mutation-accumulation / genome-decay proxy
-R(m, T) = retained robustness
-S(m, T) = net long-term score
-```
-
-Where:
+The current primary model uses generational lineage survival:
 
 ```text
-m = mutation-rate multiplier relative to wild type
-T = number of generations
-
-S(m, T) = B(m, T) - lambda_decay * D(m, T) + rho_robustness * R(m, T)
+mutation_rate_multiplier = fixed input for one run
+population_size = integer population sampled each generation
+generation = X axis for the main output chart
 ```
 
-Important: `D(m, T)` is a scalar proxy. It is not a direct measurement of every harmful mutation. It combines mutation accumulation, deleterious load, and inferred loss of genome integrity into one deliberately simplified term.
+Each surviving lineage class carries:
 
-The first model is intended to test whether assumptions produce biologically plausible curve shapes, not to estimate a true biological optimum.
+```text
+accumulated selected-environment benefit
+accumulated mutation-accumulation / genome-decay proxy
+retained robustness
+relative fitness
+```
 
-Later versions may add stochastic Wright-Fisher simulation, Approximate Bayesian Computation, Bayesian hierarchical fitting, and state-space models.
+Important: `D` is a scalar proxy. It is not a direct measurement of every harmful mutation. It combines mutation accumulation, deleterious load, and inferred loss of genome integrity into one deliberately simplified term.
+
+The lineage model is intended to test whether assumptions produce biologically plausible survival trajectories, not to estimate a true biological optimum.
+
+The older deterministic curve helpers remain in the package for calibration context and future mutation-rate sweeps, but survival is now modelled generation by generation rather than as a final weight over mutation-rate bins.
 
 ## Experimental data scaffold
 
@@ -137,8 +140,6 @@ calibration_dataset_v0 currently contains real Sprouffske et al. 2018 mutation-r
 
 The curated relative-fitness values are computed from Dryad `growth-curves.txt` as `r_evo - r_anc`, following the paper methods. The raw Dryad final timepoint is generation `2907`; the paper labels this final timepoint as approximately `3000` generations, and the processed rows preserve that context in curation notes.
 
-In calibrated mode, the app derives the evaluated mutation-rate range from the selected strain and closest experimental generation in `calibration_dataset_v0` before computing thresholds. The generation horizon control selects the nearest experimental generation for calibration. Every model input is displayed with provenance: empirical, fitted, assumed, or unsupported by the current data. Parameters that cannot yet be estimated from exact observations remain marked as unsupported exploratory fallbacks rather than fitted values.
-
 Processed observations should preserve source context, including:
 
 - source or paper
@@ -157,17 +158,15 @@ Raw data should remain immutable. Processed data should document transformations
 
 The local GUI allows the user to:
 
-- inspect raw experimental observations before model curves
-- enable manual parameter overrides for hypothesis exploration
-- select Sprouffske strain class (`MRS`, `MRM`, `MRL`, `MRXL`)
-- change mutation-rate range
-- change generation horizon
-- change benefit, decay, and robustness parameters
-- observe benefit, decay, robustness, and net-score curves
-- inspect whether curve behaviour looks biologically plausible
-- view model-input provenance and the experimental-data inventory scaffold
+- set a fixed mutation-rate multiplier
+- set population size and generation horizon
+- adjust mutation supply, benefit, decay, robustness, and survival parameters
+- observe mean population fitness, best surviving lineage fitness, and dominant lineage fitness by generation
+- observe beneficial adoption over time
+- inspect generation history and final surviving lineage classes
 
-The experimental-data section should be read with the provenance table. Current calibrated thresholds are sensitive to the empirical mutation-rate axis, but unsupported benefit and decay terms still depend on exploratory fallback values until exact observations are curated.
+The GUI should be read as an exploratory single-run view. Changing the random
+seed can change rare-lineage outcomes.
 
 ## Repository structure
 
@@ -181,7 +180,7 @@ mutation-rate-range-model/
   data/
     raw/
     processed/
-    sources.yaml
+    source_registry.json
 
   docs/
     scientific_background.md
@@ -195,14 +194,11 @@ mutation-rate-range-model/
   src/
     mrrm/
       __init__.py
-      config.py
       parameters.py
       curves.py
-      stochastic.py
-      fitting.py
+      lineage.py
       sensitivity.py
       validation.py
-      datasets.py
       data_loaders.py
       plotting.py
 
@@ -211,10 +207,10 @@ mutation-rate-range-model/
 
   tests/
     test_curves.py
+    test_lineage.py
     test_parameters.py
     test_sensitivity.py
     test_validation.py
-    test_datasets.py
     test_data_loaders.py
 
   reports/
@@ -237,7 +233,8 @@ The optimal mutation rate is exactly 17.3x wild type.
 A valid result is:
 
 ```text
-Under these assumptions and uncertainty ranges, the model estimates a likely net-beneficial mutation-rate range between A and B times wild type, with the peak near C to D times wild type. The result is most sensitive to genome-decay penalty and DFE assumptions.
+Under these assumptions and this random seed, beneficial lineage adoption rose
+while mean fitness remained above the selected collapse threshold.
 ```
 
 Experimental observations should be used to constrain, compare, or falsify assumptions — not to create false precision.
@@ -267,10 +264,8 @@ Start with:
 
 Likely next development steps:
 
-1. add the full Sprouffske growth-curve trajectory rows for intermediate generations
-2. separate placeholder/schema rows from real processed observations
-3. compare deterministic curves against curated data points
-4. replace deprecated Streamlit `use_container_width` calls with `width`
-5. add validation plots
-6. document which assumptions are supported, weakly supported, or contradicted
-7. only then consider stochastic simulation
+1. add a mutation-rate sweep that repeats the lineage model across small multiplier steps
+2. compare final fitness, beneficial lineage adoption, and collapse frequency across repeated seeds
+3. add validation plots for the generational trajectories
+4. document which assumptions are supported, weakly supported, or contradicted
+5. compare lineage trajectories against curated experimental observations

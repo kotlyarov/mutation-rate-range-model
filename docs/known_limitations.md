@@ -1,29 +1,31 @@
 # Known Limitations
 
-This document lists known limitations of the first deterministic version of the Mutation Rate Range Model.
+This document lists known limitations of the current Mutation Rate Range Model.
 
 ## The model is exploratory
 
-The first model is intended to test whether assumptions produce biologically plausible curve shapes.
+The lineage-survival model is intended to explore whether selected assumptions
+produce plausible generational trajectories.
 
 It does not estimate a true biological optimum.
 
-## No exact mutation effects
+## High-level mutation classes
 
-The model does not know the exact cost or benefit of each possible mutation.
-
-Instead, it uses aggregate curves for:
+The model splits new offspring into aggregate classes:
 
 ```text
-adaptive benefit
-mutation-accumulation / genome-decay proxy
-retained robustness
-net score
+no new mutation
+neutral
+harmful / decay
+beneficial
+mixed beneficial plus harmful
 ```
+
+It does not know the exact cost or benefit of each possible mutation.
 
 ## Simplified genome decay
 
-`D(m, T)` is a scalar proxy.
+`D` is a scalar proxy.
 
 It may combine several distinct biological processes:
 
@@ -36,76 +38,96 @@ It may combine several distinct biological processes:
 
 These should not be treated as identical in scientific interpretation.
 
-## Minimal population genetics only
+## Aggregated lineage classes, not individuals
 
-The first version includes only a minimal expected Survival Selection block. It
-does not explicitly model:
+The model tracks lineage classes with shared accumulated state. It does not
+simulate every organism as a separate object.
+
+This is deliberate for transparency and speed, but it means within-class
+heterogeneity is hidden.
+
+## Approximate merging at high class counts
+
+If the number of surviving classes exceeds `max_lineage_classes`, small classes
+are merged into a weighted aggregate state.
+
+This prevents runaway class growth but can blur rare lineage details. Analyses
+that depend on rare classes should check sensitivity to this limit.
+
+## Simplified population genetics
+
+The model includes stochastic mutation sampling and stochastic survival
+selection, but it is still not a full Wright-Fisher, Moran, or experimental
+transfer-process simulator.
+
+It does not explicitly model:
 
 - individual organisms
-- genetic drift
-- fixation probabilities
-- clonal interference
-- population bottlenecks
+- nutrient dynamics
+- carrying capacity
+- culture volume
+- serial-transfer dilution mechanics
+- explicit fixation probabilities
+- full clonal interference
 - hitchhiking
-- lineage structure
-- extinction risk
-
-Some of these effects may be approximated indirectly by parameters, but they are
-not simulated. The survival layer is a deterministic soft-selection expectation,
-not a Wright-Fisher or Moran simulation.
-
-## Survival Selection is not an experimental-process model
-
-`population_growth_factor` changes effective selection pressure only. It is not a
-nutrient, dilution, transfer, resource, or culture-volume submodel.
-
-`survival_stochasticity` mixes fitness-weighted survival with the previous
-generation's composition in the deterministic generation loop. It does not draw
-random survivors or estimate uncertainty.
-
-The `0.23` default is an experimentally motivated proxy from descendant-number
-variance, not a proven universal survival-stochasticity value.
-
-## No real-data fitting yet
-
-Until fitting and validation code exist, parameters are exploratory.
-
-The model should not claim that defaults are empirically estimated.
-
-## No mutation spectrum
-
-The first model treats mutation rate as a single multiplier.
-
-It does not distinguish:
-
-- transitions
-- transversions
-- indels
-- structural variants
-- DNA repair defects
-- context-dependent mutation biases
+- spatial structure
 - mutation-spectrum evolution
 
-## No environment switching
+Some effects may be approximated indirectly by parameters, but they are not
+mechanistically simulated.
 
-The selected environment is treated as stable.
+## Population size is fixed between generations
 
-The robustness term is only a proxy for performance outside the selected environment.
+Each generation is resampled to exactly `population_size` survivors.
 
-## No universal optimum
+This captures integer stochasticity and lineage disappearance, but it does not
+model absolute population growth, crash dynamics, or extinction of the entire
+population.
 
-A mutation-rate range estimated under one parameter set does not apply universally.
+## Event-rate assumptions are simple
+
+Beneficial, harmful, and neutral events are treated as independent Poisson
+arrivals before being collapsed into mutation classes.
+
+This ignores correlations among mutation types, context dependence, repair
+defects, structural variants, and changing distributions of fitness effects.
+
+## Fitness is a transparent score
+
+Fitness is calculated as:
+
+```text
+fitness = max(0, 1 + B - lambda_decay * D + rho_robustness * (R - 1))
+```
+
+This is useful for exploring assumptions, but it is not a validated biological
+fitness law.
+
+## No validated mutation-rate optimum
+
+A mutation-rate value that performs well in one run or one parameter set does
+not apply universally.
 
 The result may change with:
 
 - environment
 - population size
 - generation horizon
-- benefit distribution
+- random seed
+- beneficial event supply
 - deleterious-load assumptions
 - robustness weighting
 - mutation spectrum
-- threshold choices
+- survival strength
+- collapse or adoption thresholds
+
+## Sweep model is not implemented yet
+
+The current primary implementation is a single-run lineage model.
+
+A future mutation-rate sweep should run the same generational model repeatedly
+across mutation-rate multipliers and random seeds before estimating an
+assumption-dependent high-performing range.
 
 ## Risk of false precision
 
@@ -115,22 +137,25 @@ To reduce this risk:
 
 - display assumptions clearly
 - avoid excessive decimal precision
-- show sensitivity analysis
+- show stochastic outcomes and seeds
 - label outputs as exploratory
 - keep default parameters visibly provisional
 
 ## Risk of circular reasoning
 
-If the model is tuned to produce a desired peak, it may only confirm the modeller's assumptions.
+If the model is tuned to produce a desired adoption or collapse pattern, it may
+only confirm the modeller's assumptions.
 
-Validation must compare curve behaviour against independent empirical patterns where possible.
+Validation must compare model behavior against independent empirical patterns
+where possible.
 
 ## Current safe interpretation
 
 A safe interpretation is:
 
 ```text
-Under these assumptions, the model produces a plausible trade-off curve with a peak in this approximate range.
+Under these assumptions and this random seed, beneficial lineage adoption rose
+while mean fitness remained above the selected collapse threshold.
 ```
 
 An unsafe interpretation is:

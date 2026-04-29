@@ -1,8 +1,9 @@
-"""Parameter object for the first deterministic model."""
+"""Parameter objects for mutation-rate exploration models."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from typing import Any
 
 DEFAULT_SURVIVAL_STOCHASTICITY = 0.23
 
@@ -50,6 +51,58 @@ class ModelParameters:
         validate_parameters(self)
 
     def with_updates(self, **changes: float | int) -> "ModelParameters":
+        """Return a validated copy with selected fields changed."""
+
+        return replace(self, **changes)
+
+
+@dataclass(frozen=True)
+class LineageParameters:
+    """Inputs for one generational lineage-survival run.
+
+    A single run fixes the mutation-rate multiplier and follows surviving
+    lineage classes across generations. Defaults are exploratory assumptions,
+    not fitted biological constants.
+    """
+
+    generations: int = 1_000
+    T_ref: float = 50_000.0
+
+    mutation_rate_multiplier: float = 1.0
+    population_size: int = 1_000_000
+
+    benefit_scale: float = 1.0
+    alpha_benefit: float = 1.0
+    beneficial_effect_size: float = 0.02
+
+    neutral_rate_scale: float = 1.0
+
+    decay_scale: float = 1.0
+    gamma_decay: float = 1.2
+    decay_effect_size: float = 1.0
+
+    beta_interference: float = 0.01
+    gamma_interference: float = 1.0
+
+    k_robustness: float = 0.05
+    lambda_decay: float = 0.2
+    rho_robustness: float = 0.1
+
+    selection_strength: float = 1.0
+    minimum_survival_fitness: float = 1e-9
+
+    random_seed: int | None = 1
+    max_lineage_classes: int = 5_000
+
+    beneficial_adoption_threshold: float = 0.50
+    collapse_fitness_threshold: float = 0.50
+
+    def __post_init__(self) -> None:
+        from .validation import validate_lineage_parameters
+
+        validate_lineage_parameters(self)
+
+    def with_updates(self, **changes: Any) -> "LineageParameters":
         """Return a validated copy with selected fields changed."""
 
         return replace(self, **changes)
