@@ -28,7 +28,7 @@ The main single-run inputs are:
 
 ```text
 mutation_rate_multiplier = mutation-rate multiplier relative to wild type
-population_size = number of surviving lineages sampled each generation
+effective_population_size = number of surviving lineages sampled each generation
 generations = generation horizon
 ```
 
@@ -36,19 +36,30 @@ Additional transparent assumptions control mutation supply, inherited effects,
 interference, and survival selection:
 
 ```text
-T_ref = reference horizon used to scale per-generation event rates
-alpha_benefit = beneficial event-rate scale
-neutral_rate_scale = neutral event-rate scale
-decay_scale = harmful / decay event-rate scale
-gamma_decay = nonlinearity for harmful / decay event supply
+neutral_mutation_rate = neutral per-generation event rate at 1x mutation rate
+deleterious_mutation_rate = harmful / decay per-generation event rate at 1x mutation rate
+beneficial_mutation_rate = beneficial per-generation event rate at 1x mutation rate
 beneficial_effect_size = benefit increment from one beneficial event before interference
 decay_effect_size = decay-proxy increment from one harmful event
-benefit_scale = saturation ceiling for accumulated selected-environment benefit
-beta_interference, gamma_interference = interference parameters
-lambda_decay = fitness penalty weight for accumulated decay proxy
-rho_robustness = fitness penalty/reward weight for retained robustness
+benefit_saturation = saturation ceiling for accumulated selected-environment benefit
+interference_strength, interference_exponent = interference parameters
+robustness_decay_rate = effect of accumulated decay on retained robustness
+decay_fitness_penalty = gradual performance penalty weight for accumulated decay proxy
+robustness_fitness_weight = weight for retained-robustness performance modifier
+lethal_decay_threshold = hard accumulated-decay viability ceiling
+minimum_viable_robustness = hard retained-robustness viability floor
 selection_strength = strength of fitness-weighted survival
-random_seed = seed for reproducible stochastic runs
+viability_fitness_threshold = minimum fitness for a candidate class to remain viable
+beneficial_adoption_threshold = interpretation threshold for adoption
+collapse_fitness_threshold = interpretation threshold for collapse
+```
+
+Simulation controls are not biological assumptions and should be kept out of
+the main model interface:
+
+```text
+random_seed = reproducibility control
+max_lineage_classes = computational class-count safety limit
 ```
 
 ## Lineage state
@@ -85,9 +96,9 @@ For one generation, event probabilities are derived from independent Poisson
 arrival assumptions:
 
 ```text
-r_b = alpha_benefit * mutation_rate_multiplier / T_ref
-r_h = decay_scale * mutation_rate_multiplier^gamma_decay / T_ref
-r_n = neutral_rate_scale * mutation_rate_multiplier / T_ref
+r_b = beneficial_mutation_rate * mutation_rate_multiplier
+r_h = deleterious_mutation_rate * mutation_rate_multiplier
+r_n = neutral_mutation_rate * mutation_rate_multiplier
 
 p_b = 1 - exp(-r_b)
 p_h = 1 - exp(-r_h)
@@ -104,6 +115,11 @@ harmful = (1 - p_b) * p_h
 beneficial = p_b * (1 - p_h)
 mixed = p_b * p_h
 ```
+
+These transition probabilities are applied to every surviving lineage class in
+every generation, including classes that already carry beneficial mutations.
+Existing beneficial state does not reduce future harmful or mixed mutation
+exposure.
 
 The simulator samples integer counts from these probabilities. This means tiny
 expected probabilities do not automatically create fractional impossible
@@ -131,10 +147,10 @@ For a beneficial offspring class:
 
 ```text
 interference =
-  1 / (1 + beta_interference * interference_load^gamma_interference)
+  1 / (1 + interference_strength * interference_load^interference_exponent)
 
 benefit_increment =
-  min(benefit_scale - B_inherited, beneficial_effect_size * interference)
+  min(benefit_saturation - B_inherited, beneficial_effect_size * interference)
 
 B_next = B_inherited + benefit_increment
 D_next = D_inherited
@@ -151,36 +167,55 @@ interference_load = D_inherited + decay_effect_size
 After updating `B` and `D`:
 
 ```text
-R_next = exp(-k_robustness * D_next)
+R_next = exp(-robustness_decay_rate * D_next)
 
-fitness_next =
-  max(0, 1 + B_next - lambda_decay * D_next + rho_robustness * (R_next - 1))
+performance_fitness =
+  max(0, 1 + B_next - decay_fitness_penalty * D_next)
+
+robustness_modifier =
+  max(0, 1 - robustness_fitness_weight * (1 - R_next))
+
+fitness_next = performance_fitness * robustness_modifier
 ```
 
-The `rho_robustness * (R - 1)` term makes the starting generation fitness equal
-to 1.0 and treats robustness loss as a conditional fitness penalty rather than
-an unconditional bonus.
+Robustness is not an additive benefit that can cancel decay. It acts as a
+performance modifier and as a separate viability gate.
 
 ## Survival selection
 
-After mutation creates candidate offspring classes, survival selection samples
-the next generation. The population size is fixed by resampling exactly
-`population_size` survivors.
+After mutation creates candidate offspring classes, survival selection first
+removes nonviable classes. `effective_population_size` is a carrying-capacity
+limit, not a guarantee that the next generation is full.
 
 For candidate class `i`:
 
 ```text
-survival_weight_i =
-  candidate_count_i * max(fitness_i, minimum_survival_fitness)^selection_strength
+viable_i =
+  fitness_i >= viability_fitness_threshold
+  and D_i <= lethal_decay_threshold
+  and R_i >= minimum_viable_robustness
 
-survival_probability_i =
-  survival_weight_i / sum_j(survival_weight_j)
+descendant_weight_i =
+  0, if viable_i is false
+  candidate_count_i * fitness_i^selection_strength, otherwise
+
+actual_population_size_next =
+  min(effective_population_size, round(sum_i(descendant_weight_i)))
+
+survivor_counts ~ Multinomial(
+  actual_population_size_next,
+  descendant_weight / sum(descendant_weight)
+)
+
+actual_population_size_next <= effective_population_size
 ```
 
-The next generation's class counts are sampled from a multinomial distribution
-with these survival probabilities. A class can disappear if its sampled survivor
-count is zero. Surviving classes seed the next generation with their accumulated
-state intact.
+The next generation can be smaller than the carrying capacity. A badly damaged
+lineage does not survive just because empty capacity exists. Above the viability
+threshold, higher fitness improves competitive lineage success because it
+increases descendant weight without being capped at one. If all candidate
+classes are nonviable, the actual population size becomes zero and the run is
+collapsed.
 
 This is stochastic lineage-class sampling, not a deterministic post-processing
 weight over mutation-rate bins.
@@ -208,11 +243,14 @@ The run also reports:
 final mean fitness
 final best lineage fitness
 final dominant lineage fitness
+final actual population size
+carrying capacity
+viable candidate population size
 final beneficial adoption fraction
 final mean decay proxy
 whether any beneficial lineage survived
 whether beneficial adoption crossed the configured threshold
-whether mean fitness crossed the configured collapse threshold
+whether mean fitness crossed the configured collapse threshold or population collapsed
 ```
 
 All outputs must be described as conditional on the selected assumptions.

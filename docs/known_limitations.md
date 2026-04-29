@@ -48,8 +48,8 @@ heterogeneity is hidden.
 
 ## Approximate merging at high class counts
 
-If the number of surviving classes exceeds `max_lineage_classes`, small classes
-are merged into a weighted aggregate state.
+If the number of surviving classes exceeds the advanced `max_lineage_classes`
+simulation control, small classes are merged into a weighted aggregate state.
 
 This prevents runaway class growth but can blur rare lineage details. Analyses
 that depend on rare classes should check sensitivity to this limit.
@@ -76,13 +76,14 @@ It does not explicitly model:
 Some effects may be approximated indirectly by parameters, but they are not
 mechanistically simulated.
 
-## Population size is fixed between generations
+## Effective population size is only a cap
 
-Each generation is resampled to exactly `population_size` survivors.
+Each generation has at most `effective_population_size` survivors.
 
-This captures integer stochasticity and lineage disappearance, but it does not
-model absolute population growth, crash dynamics, or extinction of the entire
-population.
+This captures integer stochasticity, lineage disappearance, and simple
+population decline. It still does not model absolute population growth,
+resource-dependent recovery, crash dynamics, or experimental extinction
+protocols mechanistically.
 
 ## Event-rate assumptions are simple
 
@@ -97,11 +98,15 @@ defects, structural variants, and changing distributions of fitness effects.
 Fitness is calculated as:
 
 ```text
-fitness = max(0, 1 + B - lambda_decay * D + rho_robustness * (R - 1))
+performance_fitness = max(0, 1 + B - decay_fitness_penalty * D)
+robustness_modifier = max(0, 1 - robustness_fitness_weight * (1 - R))
+fitness = performance_fitness * robustness_modifier
 ```
 
 This is useful for exploring assumptions, but it is not a validated biological
-fitness law.
+fitness law. Separate viability gates can also remove lineages whose accumulated
+decay exceeds `lethal_decay_threshold` or whose retained robustness falls below
+`minimum_viable_robustness`.
 
 ## No validated mutation-rate optimum
 
@@ -111,7 +116,7 @@ not apply universally.
 The result may change with:
 
 - environment
-- population size
+- effective population size
 - generation horizon
 - random seed
 - beneficial event supply

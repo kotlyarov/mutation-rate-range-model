@@ -12,9 +12,11 @@ from mrrm.validation import ParameterValidationError
 def test_lineage_history_has_generation_axis_and_finite_metrics():
     params = LineageParameters(
         generations=12,
-        population_size=5_000,
-        T_ref=1_000,
+        effective_population_size=5_000,
         mutation_rate_multiplier=8.0,
+        beneficial_mutation_rate=1.0 / 1_000.0,
+        neutral_mutation_rate=1.0 / 1_000.0,
+        deleterious_mutation_rate=1.0 / 1_000.0,
         random_seed=17,
     )
     results = simulate_lineage_survival(params)
@@ -26,7 +28,8 @@ def test_lineage_history_has_generation_axis_and_finite_metrics():
     for values in history.values():
         assert values.shape == (params.generations + 1,)
         assert np.all(np.isfinite(values.astype(float)))
-    assert np.all(history["population_size"] == params.population_size)
+    assert np.all(history["carrying_capacity"] == params.effective_population_size)
+    assert np.all(history["actual_population_size"] <= params.effective_population_size)
 
 
 def test_transition_probabilities_are_valid_and_sum_to_one():
@@ -42,12 +45,11 @@ def test_transition_probabilities_are_valid_and_sum_to_one():
 def test_accumulated_state_carries_forward_across_generations():
     params = LineageParameters(
         generations=4,
-        population_size=2_000,
-        T_ref=1,
+        effective_population_size=2_000,
         mutation_rate_multiplier=1.0,
-        alpha_benefit=2.0,
-        decay_scale=0.0,
-        neutral_rate_scale=0.0,
+        beneficial_mutation_rate=2.0,
+        deleterious_mutation_rate=0.0,
+        neutral_mutation_rate=0.0,
         beneficial_effect_size=0.1,
         selection_strength=0.0,
         random_seed=4,
@@ -66,12 +68,11 @@ def test_accumulated_state_carries_forward_across_generations():
 def test_tiny_population_does_not_create_fractional_impossible_lineages():
     params = LineageParameters(
         generations=10,
-        population_size=1,
-        T_ref=1e9,
+        effective_population_size=1,
         mutation_rate_multiplier=1.0,
-        alpha_benefit=1.0,
-        decay_scale=0.0,
-        neutral_rate_scale=0.0,
+        beneficial_mutation_rate=1e-9,
+        deleterious_mutation_rate=0.0,
+        neutral_mutation_rate=0.0,
         random_seed=1,
     )
     results = simulate_lineage_survival(params)
@@ -84,9 +85,11 @@ def test_tiny_population_does_not_create_fractional_impossible_lineages():
 def test_seeded_stochastic_runs_are_reproducible():
     params = LineageParameters(
         generations=8,
-        population_size=2_500,
-        T_ref=500,
+        effective_population_size=2_500,
         mutation_rate_multiplier=12.0,
+        beneficial_mutation_rate=1.0 / 500.0,
+        neutral_mutation_rate=1.0 / 500.0,
+        deleterious_mutation_rate=1.0 / 500.0,
         random_seed=123,
     )
     first = simulate_lineage_survival(params)
@@ -102,12 +105,11 @@ def test_seeded_stochastic_runs_are_reproducible():
 def test_generation_records_split_offspring_into_mutation_classes():
     params = LineageParameters(
         generations=1,
-        population_size=10_000,
-        T_ref=1,
+        effective_population_size=10_000,
         mutation_rate_multiplier=1.0,
-        alpha_benefit=1.0,
-        decay_scale=1.0,
-        neutral_rate_scale=1.0,
+        beneficial_mutation_rate=1.0,
+        deleterious_mutation_rate=1.0,
+        neutral_mutation_rate=1.0,
         random_seed=3,
     )
     results = simulate_lineage_survival(params)
@@ -121,12 +123,186 @@ def test_generation_records_split_offspring_into_mutation_classes():
     assert record.mixed_fraction > 0
 
 
+def test_population_capacity_is_not_guaranteed_refill_after_selection():
+    params = LineageParameters(
+        generations=1,
+        effective_population_size=1_000,
+        mutation_rate_multiplier=1.0,
+        beneficial_mutation_rate=0.0,
+        neutral_mutation_rate=0.0,
+        deleterious_mutation_rate=1e9,
+        decay_effect_size=1.0,
+        decay_fitness_penalty=0.5,
+        robustness_fitness_weight=0.0,
+        random_seed=8,
+    )
+    results = simulate_lineage_survival(params)
+    record = results.history[-1]
+
+    assert record.carrying_capacity == params.effective_population_size
+    assert record.candidate_population_size == params.effective_population_size
+    assert record.viable_population_size == params.effective_population_size
+    assert record.actual_population_size == 500
+
+
+def test_population_can_collapse_when_all_candidates_are_nonviable():
+    params = LineageParameters(
+        generations=3,
+        effective_population_size=500,
+        mutation_rate_multiplier=1.0,
+        beneficial_mutation_rate=0.0,
+        neutral_mutation_rate=0.0,
+        deleterious_mutation_rate=1e9,
+        decay_effect_size=10.0,
+        decay_fitness_penalty=1.0,
+        robustness_fitness_weight=0.0,
+        random_seed=2,
+    )
+    results = simulate_lineage_survival(params)
+    first_generation = results.history[1]
+    final_generation = results.history[-1]
+
+    assert first_generation.viable_population_size == 0
+    assert first_generation.actual_population_size == 0
+    assert final_generation.actual_population_size == 0
+    assert results.final_lineages == ()
+    assert results.outcome.collapsed is True
+
+
+def test_lethal_decay_threshold_overrides_high_benefit():
+    params = LineageParameters(
+        generations=2,
+        effective_population_size=500,
+        mutation_rate_multiplier=1.0,
+        beneficial_mutation_rate=1e9,
+        neutral_mutation_rate=0.0,
+        deleterious_mutation_rate=1e9,
+        beneficial_effect_size=100.0,
+        benefit_saturation=1_000.0,
+        decay_effect_size=10.0,
+        decay_fitness_penalty=0.0,
+        robustness_fitness_weight=0.0,
+        lethal_decay_threshold=5.0,
+        random_seed=11,
+    )
+    results = simulate_lineage_survival(params)
+    first_generation = results.history[1]
+
+    assert first_generation.mixed_mutation_offspring == params.effective_population_size
+    assert first_generation.viable_population_size == 0
+    assert first_generation.actual_population_size == 0
+    assert results.outcome.collapsed is True
+
+
+def test_minimum_robustness_threshold_overrides_high_benefit():
+    params = LineageParameters(
+        generations=2,
+        effective_population_size=500,
+        mutation_rate_multiplier=1.0,
+        beneficial_mutation_rate=1e9,
+        neutral_mutation_rate=0.0,
+        deleterious_mutation_rate=1e9,
+        beneficial_effect_size=100.0,
+        benefit_saturation=1_000.0,
+        decay_effect_size=2.0,
+        decay_fitness_penalty=0.0,
+        robustness_decay_rate=1.0,
+        robustness_fitness_weight=0.0,
+        lethal_decay_threshold=100.0,
+        minimum_viable_robustness=0.5,
+        random_seed=12,
+    )
+    results = simulate_lineage_survival(params)
+    first_generation = results.history[1]
+
+    assert first_generation.mixed_mutation_offspring == params.effective_population_size
+    assert first_generation.viable_population_size == 0
+    assert first_generation.actual_population_size == 0
+    assert results.outcome.collapsed is True
+
+
+def test_already_beneficial_lineages_continue_facing_mutation_exposure():
+    params = LineageParameters(
+        generations=2,
+        effective_population_size=20_000,
+        mutation_rate_multiplier=1.0,
+        beneficial_mutation_rate=2.0,
+        neutral_mutation_rate=0.0,
+        deleterious_mutation_rate=0.5,
+        beneficial_effect_size=0.5,
+        decay_effect_size=0.1,
+        decay_fitness_penalty=0.0,
+        robustness_fitness_weight=0.0,
+        benefit_saturation=10.0,
+        lethal_decay_threshold=100.0,
+        random_seed=23,
+    )
+    results = simulate_lineage_survival(params)
+    second_generation = results.history[2]
+
+    assert results.history[1].beneficial_adoption_fraction > 0
+    assert second_generation.beneficial_parent_population_size > 0
+    assert (
+        second_generation.beneficial_parent_harmful_mutation_offspring
+        + second_generation.beneficial_parent_mixed_mutation_offspring
+    ) > 0
+    assert (
+        second_generation.beneficial_parent_no_mutation_offspring
+        + second_generation.beneficial_parent_neutral_mutation_offspring
+    ) > 0
+
+
+def test_beneficial_effect_size_changes_competitive_success():
+    base_params = {
+        "generations": 10,
+        "effective_population_size": 10_000,
+        "mutation_rate_multiplier": 1.0,
+        "beneficial_mutation_rate": 0.02,
+        "neutral_mutation_rate": 0.0,
+        "deleterious_mutation_rate": 0.005,
+        "decay_effect_size": 0.2,
+        "decay_fitness_penalty": 0.2,
+        "robustness_fitness_weight": 0.0,
+        "benefit_saturation": 10.0,
+        "selection_strength": 2.0,
+        "random_seed": 42,
+    }
+    low_effect = simulate_lineage_survival(
+        LineageParameters(**base_params, beneficial_effect_size=1e-6)
+    )
+    high_effect = simulate_lineage_survival(
+        LineageParameters(**base_params, beneficial_effect_size=1.0)
+    )
+
+    assert (
+        high_effect.outcome.final_beneficial_adoption_fraction
+        > low_effect.outcome.final_beneficial_adoption_fraction + 0.5
+    )
+    assert (
+        high_effect.outcome.final_mean_fitness
+        > low_effect.outcome.final_mean_fitness + 1.0
+    )
+    assert (
+        high_effect.outcome.final_actual_population_size
+        > low_effect.outcome.final_actual_population_size
+    )
+
+
 def test_invalid_lineage_parameters_raise_clear_errors():
     with pytest.raises(ParameterValidationError, match="mutation_rate_multiplier"):
         LineageParameters(mutation_rate_multiplier=0.0)
 
-    with pytest.raises(ParameterValidationError, match="population_size"):
-        LineageParameters(population_size=0)
+    with pytest.raises(ParameterValidationError, match="effective_population_size"):
+        LineageParameters(effective_population_size=0)
 
     with pytest.raises(ParameterValidationError, match="generations"):
         LineageParameters(generations=0)
+
+    with pytest.raises(ParameterValidationError, match="viability_fitness_threshold"):
+        LineageParameters(viability_fitness_threshold=-0.1)
+
+    with pytest.raises(ParameterValidationError, match="lethal_decay_threshold"):
+        LineageParameters(lethal_decay_threshold=-1.0)
+
+    with pytest.raises(ParameterValidationError, match="minimum_viable_robustness"):
+        LineageParameters(minimum_viable_robustness=1.1)

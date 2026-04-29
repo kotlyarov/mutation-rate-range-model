@@ -65,37 +65,34 @@ class LineageParameters:
     not fitted biological constants.
     """
 
-    generations: int = 1_000
-    T_ref: float = 50_000.0
-
     mutation_rate_multiplier: float = 1.0
-    population_size: int = 1_000_000
+    effective_population_size: int = 1_000_000
+    generations: int = 1_000
 
-    benefit_scale: float = 1.0
-    alpha_benefit: float = 1.0
+    beneficial_mutation_rate: float = 1.0 / 50_000.0
+    neutral_mutation_rate: float = 1.0 / 50_000.0
+    deleterious_mutation_rate: float = 1.0 / 50_000.0
+
     beneficial_effect_size: float = 0.02
-
-    neutral_rate_scale: float = 1.0
-
-    decay_scale: float = 1.0
-    gamma_decay: float = 1.2
     decay_effect_size: float = 1.0
 
-    beta_interference: float = 0.01
-    gamma_interference: float = 1.0
+    benefit_saturation: float = 1.0
+    interference_strength: float = 0.01
+    interference_exponent: float = 1.0
 
-    k_robustness: float = 0.05
-    lambda_decay: float = 0.2
-    rho_robustness: float = 0.1
+    robustness_decay_rate: float = 0.05
+    decay_fitness_penalty: float = 0.2
+    robustness_fitness_weight: float = 0.1
+    lethal_decay_threshold: float = 50.0
+    minimum_viable_robustness: float = 1e-6
 
     selection_strength: float = 1.0
-    minimum_survival_fitness: float = 1e-9
+    viability_fitness_threshold: float = 1e-9
+    beneficial_adoption_threshold: float = 0.50
+    collapse_fitness_threshold: float = 0.50
 
     random_seed: int | None = 1
     max_lineage_classes: int = 5_000
-
-    beneficial_adoption_threshold: float = 0.50
-    collapse_fitness_threshold: float = 0.50
 
     def __post_init__(self) -> None:
         from .validation import validate_lineage_parameters

@@ -117,6 +117,23 @@ def validate_parameters(params: Any) -> None:
 def validate_lineage_parameters(params: Any) -> None:
     """Validate a LineageParameters-like object."""
 
+    mutation_rate_multiplier = _require_positive(
+        "mutation_rate_multiplier",
+        params.mutation_rate_multiplier,
+    )
+
+    if isinstance(params.effective_population_size, bool) or not isinstance(
+        params.effective_population_size,
+        numbers.Integral,
+    ):
+        raise ParameterValidationError("effective_population_size must be an integer.")
+    if params.effective_population_size < 1:
+        raise ParameterValidationError("effective_population_size must be at least 1.")
+    if params.effective_population_size > MAX_POPULATION_SIZE:
+        raise ParameterValidationError(
+            f"effective_population_size must be <= {MAX_POPULATION_SIZE}."
+        )
+
     if isinstance(params.generations, bool) or not isinstance(
         params.generations,
         numbers.Integral,
@@ -127,41 +144,23 @@ def validate_lineage_parameters(params: Any) -> None:
     if params.generations > MAX_GENERATIONS:
         raise ParameterValidationError(f"generations must be <= {MAX_GENERATIONS}.")
 
-    _require_positive("T_ref", params.T_ref)
-    mutation_rate_multiplier = _require_positive(
-        "mutation_rate_multiplier",
-        params.mutation_rate_multiplier,
-    )
-
-    if isinstance(params.population_size, bool) or not isinstance(
-        params.population_size,
-        numbers.Integral,
-    ):
-        raise ParameterValidationError("population_size must be an integer.")
-    if params.population_size < 1:
-        raise ParameterValidationError("population_size must be at least 1.")
-    if params.population_size > MAX_POPULATION_SIZE:
-        raise ParameterValidationError(
-            f"population_size must be <= {MAX_POPULATION_SIZE}."
-        )
-
-    _require_nonnegative("benefit_scale", params.benefit_scale)
-    _require_nonnegative("alpha_benefit", params.alpha_benefit)
+    _require_nonnegative("beneficial_mutation_rate", params.beneficial_mutation_rate)
+    _require_nonnegative("neutral_mutation_rate", params.neutral_mutation_rate)
+    _require_nonnegative("deleterious_mutation_rate", params.deleterious_mutation_rate)
     _require_nonnegative("beneficial_effect_size", params.beneficial_effect_size)
-    _require_nonnegative("neutral_rate_scale", params.neutral_rate_scale)
-
-    _require_nonnegative("decay_scale", params.decay_scale)
-    _require_positive("gamma_decay", params.gamma_decay)
     _require_nonnegative("decay_effect_size", params.decay_effect_size)
 
-    _require_nonnegative("beta_interference", params.beta_interference)
-    _require_positive("gamma_interference", params.gamma_interference)
+    _require_nonnegative("benefit_saturation", params.benefit_saturation)
+    _require_nonnegative("interference_strength", params.interference_strength)
+    _require_positive("interference_exponent", params.interference_exponent)
 
-    _require_nonnegative("k_robustness", params.k_robustness)
-    _require_nonnegative("lambda_decay", params.lambda_decay)
-    _require_nonnegative("rho_robustness", params.rho_robustness)
+    _require_nonnegative("robustness_decay_rate", params.robustness_decay_rate)
+    _require_nonnegative("decay_fitness_penalty", params.decay_fitness_penalty)
+    _require_nonnegative("robustness_fitness_weight", params.robustness_fitness_weight)
+    _require_nonnegative("lethal_decay_threshold", params.lethal_decay_threshold)
+    _require_fraction("minimum_viable_robustness", params.minimum_viable_robustness)
     _require_nonnegative("selection_strength", params.selection_strength)
-    _require_positive("minimum_survival_fitness", params.minimum_survival_fitness)
+    _require_nonnegative("viability_fitness_threshold", params.viability_fitness_threshold)
     _require_fraction(
         "beneficial_adoption_threshold",
         params.beneficial_adoption_threshold,
@@ -188,23 +187,18 @@ def validate_lineage_parameters(params: Any) -> None:
 
     _require_safe_product(
         "beneficial event rate",
-        params.alpha_benefit,
+        params.beneficial_mutation_rate,
         mutation_rate_multiplier,
     )
     _require_safe_product(
         "neutral event rate",
-        params.neutral_rate_scale,
+        params.neutral_mutation_rate,
         mutation_rate_multiplier,
-    )
-    _require_safe_power(
-        "lineage decay event rate",
-        mutation_rate_multiplier,
-        params.gamma_decay,
     )
     _require_safe_product(
-        "lineage decay event rate",
-        params.decay_scale,
-        math.exp(params.gamma_decay * math.log(mutation_rate_multiplier)),
+        "deleterious event rate",
+        params.deleterious_mutation_rate,
+        mutation_rate_multiplier,
     )
     _require_safe_product(
         "maximum accumulated lineage decay",
@@ -215,7 +209,7 @@ def validate_lineage_parameters(params: Any) -> None:
         "maximum weighted lineage decay",
         float(params.generations),
         params.decay_effect_size,
-        params.lambda_decay,
+        params.decay_fitness_penalty,
     )
 
 

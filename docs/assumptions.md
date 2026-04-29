@@ -9,7 +9,8 @@ The model assumes:
 - an *E. coli*-like asexual population
 - mutation rate is represented as a multiplier relative to wild type
 - one lineage run uses one fixed mutation-rate multiplier
-- population size controls stochastic mutation and survival sampling
+- effective population size is a carrying-capacity limit for stochastic mutation
+  and survival sampling
 - selected-environment benefit and genome integrity remain conceptually separate
 - outputs are exploratory trajectories, not exact biological measurements
 - results are conditional on parameter choices and random seed
@@ -52,6 +53,10 @@ beneficial mutation
 mixed beneficial plus harmful mutation
 ```
 
+The same mutation-class split is applied to all surviving lineage classes each
+generation. A lineage that already has beneficial state can still produce
+harmful and mixed descendants in later generations.
+
 These are aggregate classes. The model does not initially distinguish:
 
 - point mutations
@@ -62,21 +67,25 @@ These are aggregate classes. The model does not initially distinguish:
 
 Later versions may separate mutation rate and mutation spectrum.
 
-### Population size
+### Effective population size
 
-Population size is modelled through integer stochastic sampling.
+Effective population size is modelled as a hard carrying-capacity limit through
+integer stochastic sampling.
 
 Tiny expected probabilities do not create fractional lineage classes. A rare
 class appears only if a random mutation draw creates at least one offspring and
 then a survival draw leaves at least one survivor.
+
+The actual population size can be lower than the carrying capacity if candidate
+lineages are nonviable or fail survival selection.
 
 ### Adaptive benefit
 
 Accumulated selected-environment benefit is represented as `B`.
 
 Beneficial mutations add increments to inherited benefit until the configured
-`benefit_scale` is reached. This is a saturation assumption, not a claim that
-all beneficial mutations share one real effect size.
+`benefit_saturation` is reached. This is a saturation assumption, not a claim
+that all beneficial mutations share one real effect size.
 
 ### Genome decay proxy
 
@@ -95,7 +104,7 @@ of lost genes.
 Retained robustness is represented as:
 
 ```text
-R = exp(-k_robustness * D)
+R = exp(-robustness_decay_rate * D)
 ```
 
 It is a bounded proxy for the ability to retain performance outside the selected
@@ -118,18 +127,32 @@ epistasis, or distribution-of-fitness-effects model.
 Lineage fitness is calculated from inherited state:
 
 ```text
-fitness = max(0, 1 + B - lambda_decay * D + rho_robustness * (R - 1))
+performance_fitness = max(0, 1 + B - decay_fitness_penalty * D)
+robustness_modifier = max(0, 1 - robustness_fitness_weight * (1 - R))
+fitness = performance_fitness * robustness_modifier
 ```
 
-The starting generation has fitness 1.0. Selected-environment benefit, decay
-proxy, and retained robustness remain separately reported even though survival
-selection uses the combined fitness.
+The starting generation has fitness 1.0. Robustness does not add back fitness
+or cancel accumulated decay. It only reduces performance as robustness declines.
+Selected-environment benefit, decay proxy, and retained robustness remain
+separately reported even though survival selection uses the combined fitness.
 
 ### Survival selection
 
 Survival selection is stochastic. Candidate offspring classes are sampled from
-the current lineage classes, then the next generation is sampled from
-fitness-weighted candidate classes.
+the current lineage classes. Candidate classes below
+`viability_fitness_threshold`, above `lethal_decay_threshold`, or below
+`minimum_viable_robustness` are removed. Viable classes receive descendant
+weight proportional to:
+
+```text
+class_count * fitness^selection_strength
+```
+
+The next generation is sampled competitively from those descendant weights and
+is capped at `effective_population_size`. Fitness above 1 is not converted into
+a capped survival probability, so larger beneficial effects can improve lineage
+share and population recovery.
 
 The model does not reset biological state each generation. Surviving classes
 carry accumulated benefit, accumulated decay, robustness, and fitness forward.
@@ -142,17 +165,21 @@ The model tracks aggregated lineage classes rather than individual organisms.
 
 This keeps the implementation transparent and fast enough for local exploration,
 but it is still an approximation. If the number of surviving classes exceeds
-`max_lineage_classes`, small classes are merged into a weighted aggregate class.
+the advanced `max_lineage_classes` simulation control, small classes are merged
+into a weighted aggregate class.
 
-### Fixed surviving population size
+### Carrying-capacity-limited population size
 
-Each generation is resampled to `population_size` survivors. The current model
-does not simulate explicit resource growth, dilution protocols, culture volume,
-or carrying-capacity dynamics.
+Each generation can contain at most `effective_population_size` survivors. The
+model does not automatically refill empty capacity after selection, and the
+actual population can decline or collapse. The current model still does not
+simulate explicit resource growth, dilution protocols, culture volume, or
+carrying-capacity dynamics.
 
 ### Seeded randomness
 
-Runs are stochastic but can be reproduced with `random_seed`.
+Runs are stochastic but can be reproduced with the advanced `random_seed`
+simulation control.
 
 Changing the seed can change whether rare lineages appear, survive, or disappear.
 Scientific interpretation should use repeated runs, especially once mutation-rate

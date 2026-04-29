@@ -39,14 +39,19 @@ def main() -> None:
     )
 
     outcome = results.outcome
-    cols = st.columns(4)
-    cols[0].metric("final mean fitness", f"{outcome.final_mean_fitness:.3g}")
-    cols[1].metric("best lineage fitness", f"{outcome.final_best_fitness:.3g}")
-    cols[2].metric(
+    cols = st.columns(5)
+    cols[0].metric(
+        "final population",
+        f"{outcome.final_actual_population_size:,}",
+        f"cap {outcome.carrying_capacity:,}",
+    )
+    cols[1].metric("final mean fitness", f"{outcome.final_mean_fitness:.3g}")
+    cols[2].metric("best lineage fitness", f"{outcome.final_best_fitness:.3g}")
+    cols[3].metric(
         "beneficial adoption",
         f"{outcome.final_beneficial_adoption_fraction:.1%}",
     )
-    cols[3].metric("mean decay proxy", f"{outcome.final_mean_decay:.3g}")
+    cols[4].metric("mean decay proxy", f"{outcome.final_mean_decay:.3g}")
 
     st.plotly_chart(make_lineage_fitness_figure(results), use_container_width=True)
 
@@ -54,10 +59,12 @@ def main() -> None:
     st.write(
         {
             "mutation_rate_multiplier": params.mutation_rate_multiplier,
-            "population_size": params.population_size,
+            "effective_population_size": params.effective_population_size,
+            "final_actual_population_size": outcome.final_actual_population_size,
+            "final_viable_population_size": outcome.final_viable_population_size,
             "beneficial_survived": outcome.beneficial_survived,
             "beneficial_reached_adoption_threshold": outcome.beneficial_adopted,
-            "mean_fitness_below_collapse_threshold": outcome.collapsed,
+            "collapsed": outcome.collapsed,
             "final_lineage_classes": outcome.final_lineage_class_count,
             "transition_probabilities": results.transition_probabilities.as_dict(),
         }
@@ -79,75 +86,54 @@ def main() -> None:
             use_container_width=True,
         )
 
+    _render_model_audit(results)
+
 
 def _sidebar_parameters(defaults: LineageParameters | None = None) -> LineageParameters:
     defaults = defaults or LineageParameters()
-    st.sidebar.header("Lineage run")
+    st.sidebar.header("Model inputs")
 
-    mutation_rate_multiplier = st.sidebar.number_input(
-        "mutation_rate_multiplier",
-        min_value=1e-9,
-        value=float(defaults.mutation_rate_multiplier),
-        format="%.6g",
-    )
-    population_size = st.sidebar.number_input(
-        "population_size",
-        min_value=1,
-        value=int(defaults.population_size),
-        step=10_000,
-    )
-    generations = st.sidebar.number_input(
-        "generations",
-        min_value=1,
-        value=int(defaults.generations),
-        step=100,
-    )
-    random_seed = st.sidebar.number_input(
-        "random_seed",
-        min_value=0,
-        value=int(defaults.random_seed or 0),
-        step=1,
-    )
-
-    with st.sidebar.expander("Mutation supply", expanded=False):
-        T_ref = st.number_input(
-            "T_ref",
-            min_value=1.0,
-            value=float(defaults.T_ref),
-            step=1_000.0,
-        )
-        alpha_benefit = st.number_input(
-            "alpha_benefit",
-            min_value=0.0,
-            value=float(defaults.alpha_benefit),
-            format="%.6g",
-        )
-        neutral_rate_scale = st.number_input(
-            "neutral_rate_scale",
-            min_value=0.0,
-            value=float(defaults.neutral_rate_scale),
-            format="%.6g",
-        )
-        decay_scale = st.number_input(
-            "decay_scale",
-            min_value=0.0,
-            value=float(defaults.decay_scale),
-            format="%.6g",
-        )
-        gamma_decay = st.number_input(
-            "gamma_decay",
+    with st.sidebar.expander("Experimental setup", expanded=True):
+        mutation_rate_multiplier = st.number_input(
+            "mutation_rate_multiplier",
             min_value=1e-9,
-            value=float(defaults.gamma_decay),
+            value=float(defaults.mutation_rate_multiplier),
+            format="%.6g",
+        )
+        effective_population_size = st.number_input(
+            "effective_population_size",
+            min_value=1,
+            value=int(defaults.effective_population_size),
+            step=10_000,
+        )
+        generations = st.number_input(
+            "generations",
+            min_value=1,
+            value=int(defaults.generations),
+            step=100,
+        )
+
+    with st.sidebar.expander("Mutation supply", expanded=True):
+        neutral_mutation_rate = st.number_input(
+            "neutral_mutation_rate",
+            min_value=0.0,
+            value=float(defaults.neutral_mutation_rate),
+            format="%.6g",
+        )
+        deleterious_mutation_rate = st.number_input(
+            "deleterious_mutation_rate",
+            min_value=0.0,
+            value=float(defaults.deleterious_mutation_rate),
+            format="%.6g",
+        )
+        beneficial_mutation_rate = st.number_input(
+            "beneficial_mutation_rate",
+            min_value=0.0,
+            value=float(defaults.beneficial_mutation_rate),
             format="%.6g",
         )
 
-    with st.sidebar.expander("Inherited effects", expanded=False):
-        benefit_scale = st.number_input(
-            "benefit_scale",
-            min_value=0.0,
-            value=float(defaults.benefit_scale),
-            format="%.6g",
-        )
+    with st.sidebar.expander("Mutation effects", expanded=True):
         beneficial_effect_size = st.number_input(
             "beneficial_effect_size",
             min_value=0.0,
@@ -160,57 +146,68 @@ def _sidebar_parameters(defaults: LineageParameters | None = None) -> LineagePar
             value=float(defaults.decay_effect_size),
             format="%.6g",
         )
-        beta_interference = st.number_input(
-            "beta_interference",
+        benefit_saturation = st.number_input(
+            "benefit_saturation",
             min_value=0.0,
-            value=float(defaults.beta_interference),
+            value=float(defaults.benefit_saturation),
             format="%.6g",
         )
-        gamma_interference = st.number_input(
-            "gamma_interference",
+        robustness_decay_rate = st.number_input(
+            "robustness_decay_rate",
+            min_value=0.0,
+            value=float(defaults.robustness_decay_rate),
+            format="%.6g",
+        )
+        interference_strength = st.number_input(
+            "interference_strength",
+            min_value=0.0,
+            value=float(defaults.interference_strength),
+            format="%.6g",
+        )
+        interference_exponent = st.number_input(
+            "interference_exponent",
             min_value=1e-9,
-            value=float(defaults.gamma_interference),
+            value=float(defaults.interference_exponent),
             format="%.6g",
         )
 
-    with st.sidebar.expander("Fitness and survival", expanded=False):
-        k_robustness = st.number_input(
-            "k_robustness",
-            min_value=0.0,
-            value=float(defaults.k_robustness),
-            format="%.6g",
-        )
-        lambda_decay = st.number_input(
-            "lambda_decay",
-            min_value=0.0,
-            value=float(defaults.lambda_decay),
-            format="%.6g",
-        )
-        rho_robustness = st.number_input(
-            "rho_robustness",
-            min_value=0.0,
-            value=float(defaults.rho_robustness),
-            format="%.6g",
-        )
+    with st.sidebar.expander("Selection and survival", expanded=True):
         selection_strength = st.number_input(
             "selection_strength",
             min_value=0.0,
             value=float(defaults.selection_strength),
             format="%.6g",
         )
-        minimum_survival_fitness = st.number_input(
-            "minimum_survival_fitness",
-            min_value=1e-12,
-            value=float(defaults.minimum_survival_fitness),
+        viability_fitness_threshold = st.number_input(
+            "viability_fitness_threshold",
+            min_value=0.0,
+            value=float(defaults.viability_fitness_threshold),
             format="%.6g",
         )
-
-    with st.sidebar.expander("Reporting thresholds", expanded=False):
-        max_lineage_classes = st.number_input(
-            "max_lineage_classes",
-            min_value=1,
-            value=int(defaults.max_lineage_classes),
-            step=500,
+        lethal_decay_threshold = st.number_input(
+            "lethal_decay_threshold",
+            min_value=0.0,
+            value=float(defaults.lethal_decay_threshold),
+            format="%.6g",
+        )
+        minimum_viable_robustness = st.number_input(
+            "minimum_viable_robustness",
+            min_value=0.0,
+            max_value=1.0,
+            value=float(defaults.minimum_viable_robustness),
+            format="%.6g",
+        )
+        decay_fitness_penalty = st.number_input(
+            "decay_fitness_penalty",
+            min_value=0.0,
+            value=float(defaults.decay_fitness_penalty),
+            format="%.6g",
+        )
+        robustness_fitness_weight = st.number_input(
+            "robustness_fitness_weight",
+            min_value=0.0,
+            value=float(defaults.robustness_fitness_weight),
+            format="%.6g",
         )
         beneficial_adoption_threshold = st.slider(
             "beneficial_adoption_threshold",
@@ -227,30 +224,247 @@ def _sidebar_parameters(defaults: LineageParameters | None = None) -> LineagePar
             step=0.05,
         )
 
+    with st.sidebar.expander("Advanced simulation controls", expanded=False):
+        random_seed = st.number_input(
+            "random_seed",
+            min_value=0,
+            value=int(defaults.random_seed or 0),
+            step=1,
+        )
+        max_lineage_classes = st.number_input(
+            "max_lineage_classes",
+            min_value=1,
+            value=int(defaults.max_lineage_classes),
+            step=500,
+        )
+
     return LineageParameters(
-        generations=int(generations),
-        T_ref=T_ref,
         mutation_rate_multiplier=mutation_rate_multiplier,
-        population_size=int(population_size),
-        benefit_scale=benefit_scale,
-        alpha_benefit=alpha_benefit,
+        effective_population_size=int(effective_population_size),
+        generations=int(generations),
+        beneficial_mutation_rate=beneficial_mutation_rate,
+        neutral_mutation_rate=neutral_mutation_rate,
+        deleterious_mutation_rate=deleterious_mutation_rate,
         beneficial_effect_size=beneficial_effect_size,
-        neutral_rate_scale=neutral_rate_scale,
-        decay_scale=decay_scale,
-        gamma_decay=gamma_decay,
         decay_effect_size=decay_effect_size,
-        beta_interference=beta_interference,
-        gamma_interference=gamma_interference,
-        k_robustness=k_robustness,
-        lambda_decay=lambda_decay,
-        rho_robustness=rho_robustness,
+        benefit_saturation=benefit_saturation,
+        interference_strength=interference_strength,
+        interference_exponent=interference_exponent,
+        robustness_decay_rate=robustness_decay_rate,
+        decay_fitness_penalty=decay_fitness_penalty,
+        robustness_fitness_weight=robustness_fitness_weight,
         selection_strength=selection_strength,
-        minimum_survival_fitness=minimum_survival_fitness,
-        random_seed=int(random_seed),
-        max_lineage_classes=int(max_lineage_classes),
+        viability_fitness_threshold=viability_fitness_threshold,
+        lethal_decay_threshold=lethal_decay_threshold,
+        minimum_viable_robustness=minimum_viable_robustness,
         beneficial_adoption_threshold=beneficial_adoption_threshold,
         collapse_fitness_threshold=collapse_fitness_threshold,
+        random_seed=int(random_seed),
+        max_lineage_classes=int(max_lineage_classes),
     )
+
+
+def _render_model_audit(results) -> None:
+    params = results.params
+    final_record = results.history[-1]
+
+    with st.expander("Model audit", expanded=False):
+        st.subheader("Formulas")
+        st.code(
+            "\n".join(
+                [
+                    "r_b = beneficial_mutation_rate * mutation_rate_multiplier",
+                    "r_h = deleterious_mutation_rate * mutation_rate_multiplier",
+                    "r_n = neutral_mutation_rate * mutation_rate_multiplier",
+                    "p_event = 1 - exp(-r_event)",
+                    "no_new_mutation = (1 - p_b) * (1 - p_h) * (1 - p_n)",
+                    "neutral = (1 - p_b) * (1 - p_h) * p_n",
+                    "harmful = (1 - p_b) * p_h",
+                    "beneficial = p_b * (1 - p_h)",
+                    "mixed = p_b * p_h",
+                    "the same class probabilities apply to every lineage each generation",
+                    "has_beneficial does not reduce future harmful or mixed exposure",
+                    "",
+                    "interference = 1 / (1 + interference_strength * load^interference_exponent)",
+                    "B_next = B_inherited + min(benefit_saturation - B_inherited, beneficial_effect_size * interference)",
+                    "D_next = D_inherited + decay_effect_size for harmful or mixed offspring",
+                    "R_next = exp(-robustness_decay_rate * D_next)",
+                    "performance_fitness = max(0, 1 + B - decay_fitness_penalty * D)",
+                    "robustness_modifier = max(0, 1 - robustness_fitness_weight * (1 - R))",
+                    "fitness = performance_fitness * robustness_modifier",
+                    "",
+                    "viable = fitness >= viability_fitness_threshold and D <= lethal_decay_threshold and R >= minimum_viable_robustness",
+                    "descendant_weight = 0 if not viable else class_count * fitness ** selection_strength",
+                    "next_population_size = min(carrying_capacity, round(sum(descendant_weight)))",
+                    "next class counts are sampled in proportion to descendant_weight",
+                ]
+            ),
+            language="text",
+        )
+
+        st.subheader("Population-cap logic")
+        st.code(
+            "\n".join(
+                [
+                    "carrying_capacity = effective_population_size",
+                    "candidate_population_size = actual_population_size from previous generation",
+                    "discard candidate classes below fitness, decay, or robustness viability gates",
+                    "above viability, higher fitness increases descendant weight without a survival-probability cap",
+                    "sample next class counts with Multinomial(next_population_size, descendant_weight / sum(descendant_weight))",
+                    "actual_population_size_next = sum(survivors)",
+                    "actual_population_size_next may be below carrying_capacity",
+                    "no below-threshold lineage survives because empty capacity exists",
+                    "collapse is possible when actual_population_size_next is zero",
+                ]
+            ),
+            language="text",
+        )
+
+        st.subheader("Current transition probabilities")
+        st.write(results.transition_probabilities.as_dict())
+
+        st.subheader("Final generation accounting")
+        st.write(
+            {
+                "carrying_capacity": final_record.carrying_capacity,
+                "candidate_population_size": final_record.candidate_population_size,
+                "viable_population_size": final_record.viable_population_size,
+                "viable_lineage_class_count": final_record.viable_lineage_class_count,
+                "actual_population_size": final_record.actual_population_size,
+                "lineage_class_count": final_record.lineage_class_count,
+            }
+        )
+
+        st.subheader("Beneficial-lineage mutation exposure")
+        st.write(
+            {
+                "beneficial_parent_population_size": (
+                    final_record.beneficial_parent_population_size
+                ),
+                "beneficial_parent_no_mutation_offspring": (
+                    final_record.beneficial_parent_no_mutation_offspring
+                ),
+                "beneficial_parent_neutral_mutation_offspring": (
+                    final_record.beneficial_parent_neutral_mutation_offspring
+                ),
+                "beneficial_parent_harmful_mutation_offspring": (
+                    final_record.beneficial_parent_harmful_mutation_offspring
+                ),
+                "beneficial_parent_beneficial_mutation_offspring": (
+                    final_record.beneficial_parent_beneficial_mutation_offspring
+                ),
+                "beneficial_parent_mixed_mutation_offspring": (
+                    final_record.beneficial_parent_mixed_mutation_offspring
+                ),
+                "beneficial_parent_decay_exposed_offspring": (
+                    final_record.beneficial_parent_harmful_mutation_offspring
+                    + final_record.beneficial_parent_mixed_mutation_offspring
+                ),
+            }
+        )
+        st.caption(
+            "These counts are offspring from parents that already had at least "
+            "one beneficial mutation before the generation transition."
+        )
+
+        st.subheader("Advanced simulation controls")
+        st.write(
+            {
+                "random_seed": params.random_seed,
+                "max_lineage_classes": params.max_lineage_classes,
+            }
+        )
+
+        st.subheader("Reporting thresholds")
+        st.write(
+            {
+                "beneficial_adoption_threshold": (
+                    params.beneficial_adoption_threshold
+                ),
+                "collapse_fitness_threshold": params.collapse_fitness_threshold,
+            }
+        )
+
+        st.subheader("Input provenance")
+        st.dataframe(_audit_rows(params), use_container_width=True)
+
+        st.subheader("Data sources")
+        st.write(
+            {
+                "lineage_model_calibrated_from_data": False,
+                "empirical_inputs_used": [],
+                "fitted_inputs_used": [],
+                "current_values_source": "user-selected or exploratory defaults",
+                "note": (
+                    "The current lineage run does not consume the repository's "
+                    "experimental data scaffold."
+                ),
+            }
+        )
+
+
+def _audit_rows(params: LineageParameters) -> list[dict[str, object]]:
+    biological_inputs = {
+        "mutation_rate_multiplier": "experimental setup",
+        "effective_population_size": "experimental setup",
+        "generations": "experimental setup",
+        "beneficial_mutation_rate": "mutation supply",
+        "neutral_mutation_rate": "mutation supply",
+        "deleterious_mutation_rate": "mutation supply",
+        "beneficial_effect_size": "mutation effect",
+        "decay_effect_size": "mutation effect",
+        "benefit_saturation": "mutation effect",
+        "interference_strength": "interaction",
+        "interference_exponent": "interaction",
+        "robustness_decay_rate": "robustness",
+        "decay_fitness_penalty": "fitness",
+        "robustness_fitness_weight": "fitness",
+        "selection_strength": "survival",
+        "viability_fitness_threshold": "survival",
+        "lethal_decay_threshold": "survival",
+        "minimum_viable_robustness": "survival",
+    }
+    reporting_inputs = {
+        "beneficial_adoption_threshold": "reporting threshold",
+        "collapse_fitness_threshold": "reporting threshold",
+    }
+    simulation_inputs = {
+        "random_seed": "reproducibility",
+        "max_lineage_classes": "computational safety",
+    }
+
+    rows: list[dict[str, object]] = []
+    for name, group in biological_inputs.items():
+        rows.append(
+            {
+                "parameter": name,
+                "value": getattr(params, name),
+                "group": group,
+                "provenance": "assumed",
+                "role": "biological assumption or experimental setup",
+            }
+        )
+    for name, group in reporting_inputs.items():
+        rows.append(
+            {
+                "parameter": name,
+                "value": getattr(params, name),
+                "group": group,
+                "provenance": "assumed",
+                "role": "interpretation only",
+            }
+        )
+    for name, group in simulation_inputs.items():
+        rows.append(
+            {
+                "parameter": name,
+                "value": getattr(params, name),
+                "group": group,
+                "provenance": "simulation-only",
+                "role": "advanced simulation control",
+            }
+        )
+    return rows
 
 
 if __name__ == "__main__":

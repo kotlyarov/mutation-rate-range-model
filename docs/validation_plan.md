@@ -9,7 +9,7 @@ The model should be validated against qualitative and quantitative patterns, not
 The first question is:
 
 ```text
-Do the curves behave plausibly under known biological constraints?
+Do lineage trajectories behave plausibly under known biological constraints?
 ```
 
 The later question is:
@@ -18,62 +18,73 @@ The later question is:
 Can the model reproduce empirical patterns within uncertainty?
 ```
 
-## Version-one validation
+## Current lineage-model validation
 
-For the deterministic first version, validation should focus on mathematical and behavioural checks.
+For the generational lineage-survival model, validation should focus on
+mathematical checks, stochastic reproducibility checks, and behavioural checks.
 
 ### Mathematical checks
 
 For valid parameter values:
 
-- output arrays have expected shape
+- generation histories have expected length
 - no NaN values
 - no infinite values
-- benefit is non-negative
-- decay proxy is non-negative
+- actual population size never exceeds effective population size
+- actual population size can decline below effective population size
+- mutation-class probabilities are finite and sum to one
+- benefit and decay proxy are non-negative
 - robustness is bounded between 0 and 1
-- net score changes when penalty weights change
+- seeded stochastic runs are reproducible
 
 ### Behavioural checks
 
 The model should be able to produce:
 
-- slow adaptation at very low mutation rates
-- increasing benefit at low-to-moderate mutation rates
-- increasing decay proxy at higher mutation rates
-- reduced robustness as decay proxy increases
-- a net-score peak under some parameter sets
-- monotonic or no-peak behaviour under other parameter sets if assumptions imply it
+- no impossible fractional lineages at tiny effective population size
+- beneficial lineage appearance and loss under rare-event assumptions
+- beneficial lineage spread under favourable assumptions
+- increasing decay proxy when deleterious mutation supply is high
+- reduced robustness as decay proxy accumulates
+- collapse or derailment under sufficiently harmful assumptions
 
-The model should not force a peak when the parameter choices do not support one.
+The model should not force beneficial adoption when stochastic mutation and
+survival sampling do not support it.
 
 ## Sensitivity analysis
 
 Sensitivity analysis should test how outputs change when varying:
 
-- `alpha_benefit`
-- `beta_interference`
-- `gamma_interference`
-- `decay_scale`
-- `gamma_decay`
-- `k_robustness`
-- `lambda_decay`
-- `rho_robustness`
-- threshold fractions
+- `effective_population_size`
+- `beneficial_mutation_rate`
+- `neutral_mutation_rate`
+- `deleterious_mutation_rate`
+- `beneficial_effect_size`
+- `decay_effect_size`
+- `interference_strength`
+- `interference_exponent`
+- `robustness_decay_rate`
+- `decay_fitness_penalty`
+- `robustness_fitness_weight`
+- `lethal_decay_threshold`
+- `minimum_viable_robustness`
+- `selection_strength`
+- `viability_fitness_threshold`
+- biological interpretation thresholds
 - generation horizon
 
 Report which parameters most affect:
 
-- `mu_min`
-- `mu_peak`
-- `mu_max`
-- peak score
-- robustness at peak
-- decay proxy at peak
+- final mean fitness
+- final best lineage fitness
+- beneficial lineage survival
+- beneficial adoption fraction
+- mean decay proxy
+- collapse / derailment frequency across repeated seeds
 
 ## Empirical validation later
 
-Later versions should compare model curves against empirical data.
+Later versions should compare lineage trajectories against empirical data.
 
 Potential comparisons:
 

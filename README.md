@@ -102,7 +102,7 @@ The current primary model uses generational lineage survival:
 
 ```text
 mutation_rate_multiplier = fixed input for one run
-population_size = integer population sampled each generation
+effective_population_size = carrying-capacity limit for actual population size
 generation = X axis for the main output chart
 ```
 
@@ -159,11 +159,12 @@ Raw data should remain immutable. Processed data should document transformations
 The local GUI allows the user to:
 
 - set a fixed mutation-rate multiplier
-- set population size and generation horizon
+- set effective population size and generation horizon
 - adjust mutation supply, benefit, decay, robustness, and survival parameters
 - observe mean population fitness, best surviving lineage fitness, and dominant lineage fitness by generation
 - observe beneficial adoption over time
 - inspect generation history and final surviving lineage classes
+- inspect the collapsed model audit for formulas, probabilities, population-cap logic, hidden simulation controls, thresholds, and input provenance
 
 The GUI should be read as an exploratory single-run view. Changing the random
 seed can change rare-lineage outcomes.
