@@ -80,6 +80,7 @@ Report which parameters most affect:
 - beneficial lineage survival
 - beneficial adoption fraction
 - total lineages evolved
+- total lineages survived
 - decay-led population size, when inspecting genome-decay behaviour specifically
 - collapse / derailment frequency across repeated seeds
 

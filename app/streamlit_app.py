@@ -49,12 +49,12 @@ def main() -> None:
     cols[1].metric("final mean fitness", f"{outcome.final_mean_fitness:.3g}")
     cols[2].metric("best lineage fitness", f"{outcome.final_best_fitness:.3g}")
     cols[3].metric(
-        "beneficial adoption",
-        f"{outcome.final_beneficial_adoption_fraction:.1%}",
-    )
-    cols[4].metric(
         "total lineages evolved",
         format_count_compact(outcome.final_total_lineages_evolved),
+    )
+    cols[4].metric(
+        "total lineages survived",
+        format_count_compact(outcome.final_total_lineages_survived),
     )
 
     st.caption(
@@ -70,6 +70,7 @@ def main() -> None:
             "final_actual_population_size": outcome.final_actual_population_size,
             "final_viable_population_size": outcome.final_viable_population_size,
             "total_lineages_evolved": outcome.final_total_lineages_evolved,
+            "total_lineages_survived": outcome.final_total_lineages_survived,
             "final_benefit_led_population_size": (
                 results.history[-1].beneficial_dominant_population_size
             ),
@@ -310,6 +311,7 @@ def _render_model_audit(results) -> None:
                     "benefit_decay_balance = B - decay_pressure",
                     "new_mutation_lineages = neutral + harmful + beneficial + mixed offspring",
                     "total_lineages_evolved_next = total_lineages_evolved_prior + new_mutation_lineages",
+                    "total_lineages_survived = sum(evolved_lineage_count for surviving classes)",
                     "",
                     "viable = fitness >= viability_fitness_threshold and D <= lethal_decay_threshold and R >= minimum_viable_robustness",
                     "competitive_weight = 0 if not viable else class_count * fitness ** selection_strength",
@@ -363,7 +365,17 @@ def _render_model_audit(results) -> None:
                     "generation_0_total_lineages_evolved = 0",
                     "no_mutation_offspring continue an existing lineage and are not counted as new evolved lineages",
                     "new_mutation_lineages = neutral_mutation_offspring + harmful_mutation_offspring + beneficial_mutation_offspring + mixed_mutation_offspring",
+                    "mutation offspring: evolved_lineage_count_next = offspring_count",
+                    "no-mutation offspring with no parent evolved lineages: evolved_lineage_count_next = 0",
+                    "no-mutation offspring otherwise: inherited = round(parent_evolved_lineage_count * offspring_count / parent_class_count)",
+                    "no-mutation offspring otherwise: evolved_lineage_count_next = min(offspring_count, max(1, inherited))",
+                    "after selection, if survivor_count is 0 or candidate_evolved_lineage_count is 0: surviving_evolved_lineage_count = 0",
+                    "after selection, if survivor_count >= candidate_class_count: surviving_evolved_lineage_count = min(candidate_evolved_lineage_count, survivor_count)",
+                    "after selection otherwise: sampled = Binomial(candidate_evolved_lineage_count, survivor_count / candidate_class_count)",
+                    "after selection otherwise: surviving_evolved_lineage_count = min(survivor_count, max(1, sampled))",
                     "total_lineages_evolved = cumulative sum(new_mutation_lineages over generation transitions)",
+                    "total_lineages_survived = sum(evolved_lineage_count for final surviving classes)",
+                    "total_lineages_survived <= total_lineages_evolved",
                     "the count includes mutated offspring lineages that survive and mutated offspring lineages later lost to selection, extinction, or nonviability",
                     "starting lineages at generation 0 are not counted as produced during the run",
                 ]
@@ -380,6 +392,7 @@ def _render_model_audit(results) -> None:
                 "carrying_capacity": final_record.carrying_capacity,
                 "candidate_population_size": final_record.candidate_population_size,
                 "total_lineages_evolved": final_record.total_lineages_evolved,
+                "total_lineages_survived": final_record.total_lineages_survived,
                 "viable_population_size": final_record.viable_population_size,
                 "viable_lineage_class_count": final_record.viable_lineage_class_count,
                 "actual_population_size": final_record.actual_population_size,

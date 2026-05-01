@@ -62,10 +62,12 @@ class LineageClass:
     """Aggregated surviving lineage class with inherited biological state."""
 
     count: int
+    evolved_lineage_count: int
     accumulated_benefit: float
     accumulated_decay: float
     robustness: float
     fitness: float
+    has_mutation: bool
     has_beneficial: bool
     has_harmful: bool
 
@@ -79,6 +81,7 @@ class GenerationRecord:
     actual_population_size: int
     candidate_population_size: int
     total_lineages_evolved: int
+    total_lineages_survived: int
     viable_population_size: int
     viable_lineage_class_count: int
     mean_fitness: float
@@ -125,6 +128,7 @@ class LineageOutcomeSummary:
     final_actual_population_size: int
     final_viable_population_size: int
     final_total_lineages_evolved: int
+    final_total_lineages_survived: int
     final_mean_fitness: float
     final_best_fitness: float
     final_dominant_fitness: float
@@ -274,10 +278,12 @@ def _initial_lineage(params: LineageParameters) -> LineageClass:
     fitness = _fitness_from_state(0.0, 0.0, robustness, params)
     return LineageClass(
         count=int(params.effective_population_size),
+        evolved_lineage_count=0,
         accumulated_benefit=0.0,
         accumulated_decay=0.0,
         robustness=robustness,
         fitness=fitness,
+        has_mutation=False,
         has_beneficial=False,
         has_harmful=False,
     )
@@ -289,7 +295,7 @@ def _mutate_generation(
     params: LineageParameters,
     rng: np.random.Generator,
 ) -> tuple[tuple[LineageClass, ...], np.ndarray, np.ndarray, int]:
-    candidates: dict[tuple[float, float, bool, bool], LineageClass] = {}
+    candidates: dict[tuple[float, float, bool, bool, bool], LineageClass] = {}
     transition_totals = np.zeros(len(TRANSITION_NAMES), dtype=np.int64)
     beneficial_parent_transition_totals = np.zeros(len(TRANSITION_NAMES), dtype=np.int64)
     beneficial_parent_population_size = 0
@@ -347,10 +353,16 @@ def _apply_transition(
     )
     return LineageClass(
         count=count,
+        evolved_lineage_count=_lineage_count_after_transition(
+            lineage,
+            transition_name,
+            count,
+        ),
         accumulated_benefit=accumulated_benefit,
         accumulated_decay=accumulated_decay,
         robustness=robustness,
         fitness=fitness,
+        has_mutation=lineage.has_mutation or transition_name != "no_mutation",
         has_beneficial=lineage.has_beneficial or adds_beneficial,
         has_harmful=lineage.has_harmful or adds_harmful,
     )
@@ -358,6 +370,21 @@ def _apply_transition(
 
 def _new_mutation_lineage_count(transition_counts: np.ndarray) -> int:
     return int(np.sum(transition_counts[1:]))
+
+
+def _lineage_count_after_transition(
+    lineage: LineageClass,
+    transition_name: str,
+    count: int,
+) -> int:
+    if transition_name != "no_mutation":
+        return int(count)
+    if lineage.evolved_lineage_count <= 0 or lineage.count <= 0:
+        return 0
+
+    inherited_fraction = count / lineage.count
+    inherited_count = int(round(lineage.evolved_lineage_count * inherited_fraction))
+    return min(count, max(1, inherited_count))
 
 
 def _benefit_after_new_mutation(
@@ -385,7 +412,7 @@ def _benefit_after_new_mutation(
 
 
 def _add_candidate(
-    candidates: dict[tuple[float, float, bool, bool], LineageClass],
+    candidates: dict[tuple[float, float, bool, bool, bool], LineageClass],
     lineage: LineageClass,
 ) -> None:
     key = _lineage_key(lineage)
@@ -393,13 +420,20 @@ def _add_candidate(
     if existing is None:
         candidates[key] = lineage
         return
-    candidates[key] = replace(existing, count=existing.count + lineage.count)
+    candidates[key] = replace(
+        existing,
+        count=existing.count + lineage.count,
+        evolved_lineage_count=(
+            existing.evolved_lineage_count + lineage.evolved_lineage_count
+        ),
+    )
 
 
-def _lineage_key(lineage: LineageClass) -> tuple[float, float, bool, bool]:
+def _lineage_key(lineage: LineageClass) -> tuple[float, float, bool, bool, bool]:
     return (
         round(lineage.accumulated_benefit, STATE_ROUND_DIGITS),
         round(lineage.accumulated_decay, STATE_ROUND_DIGITS),
+        lineage.has_mutation,
         lineage.has_beneficial,
         lineage.has_harmful,
     )
@@ -458,11 +492,21 @@ def _select_survivors(
 
     probabilities = competitive_weights / total_competitive_weight
     survivor_counts = rng.multinomial(next_population_size, probabilities)
-    survivors = [
-        replace(lineage, count=int(count))
-        for lineage, count in zip(viable_candidates, survivor_counts)
-        if count > 0
-    ]
+    survivors = []
+    for lineage, count in zip(viable_candidates, survivor_counts):
+        if count <= 0:
+            continue
+        survivors.append(
+            replace(
+                lineage,
+                count=int(count),
+                evolved_lineage_count=_sample_surviving_lineages(
+                    lineage,
+                    int(count),
+                    rng,
+                ),
+            )
+        )
 
     survivors_tuple = tuple(survivors)
     actual_population_size = int(sum(lineage.count for lineage in survivors_tuple))
@@ -488,6 +532,21 @@ def _competitive_weight(lineage: LineageClass, params: LineageParameters) -> flo
     if params.selection_strength == 0:
         return float(lineage.count)
     return float(lineage.count) * lineage.fitness ** params.selection_strength
+
+
+def _sample_surviving_lineages(
+    lineage: LineageClass,
+    survivor_count: int,
+    rng: np.random.Generator,
+) -> int:
+    if survivor_count <= 0 or lineage.evolved_lineage_count <= 0:
+        return 0
+    if survivor_count >= lineage.count:
+        return min(lineage.evolved_lineage_count, survivor_count)
+
+    survival_probability = survivor_count / lineage.count
+    sampled = int(rng.binomial(lineage.evolved_lineage_count, survival_probability))
+    return min(survivor_count, max(1, sampled))
 
 
 def _merge_lineage_overflow(
@@ -530,10 +589,14 @@ def _weighted_merge(
     fitness = _fitness_from_state(benefit, decay, robustness, params)
     return LineageClass(
         count=total_count,
+        evolved_lineage_count=int(
+            sum(lineage.evolved_lineage_count for lineage in lineages)
+        ),
         accumulated_benefit=benefit,
         accumulated_decay=decay,
         robustness=robustness,
         fitness=fitness,
+        has_mutation=any(lineage.has_mutation for lineage in lineages),
         has_beneficial=any(lineage.has_beneficial for lineage in lineages),
         has_harmful=any(lineage.has_harmful for lineage in lineages),
     )
@@ -557,6 +620,7 @@ def _summarize_generation(
             actual_population_size=0,
             candidate_population_size=selection.candidate_population_size,
             total_lineages_evolved=int(total_lineages_evolved),
+            total_lineages_survived=0,
             viable_population_size=selection.viable_population_size,
             viable_lineage_class_count=selection.viable_lineage_class_count,
             mean_fitness=0.0,
@@ -609,6 +673,9 @@ def _summarize_generation(
     beneficial_count = sum(
         lineage.count for lineage in lineages if lineage.has_beneficial
     )
+    survived_lineage_count = sum(
+        lineage.evolved_lineage_count for lineage in lineages
+    )
     beneficial_dominant_count = sum(
         lineage.count
         for lineage in lineages
@@ -631,6 +698,7 @@ def _summarize_generation(
         actual_population_size=total_count,
         candidate_population_size=selection.candidate_population_size,
         total_lineages_evolved=int(total_lineages_evolved),
+        total_lineages_survived=int(survived_lineage_count),
         viable_population_size=selection.viable_population_size,
         viable_lineage_class_count=selection.viable_lineage_class_count,
         mean_fitness=float(np.average(fitness_values, weights=weights)),
@@ -698,6 +766,7 @@ def _summarize_outcome(
         final_actual_population_size=final_record.actual_population_size,
         final_viable_population_size=final_record.viable_population_size,
         final_total_lineages_evolved=final_record.total_lineages_evolved,
+        final_total_lineages_survived=final_record.total_lineages_survived,
         final_mean_fitness=final_record.mean_fitness,
         final_best_fitness=final_record.best_fitness,
         final_dominant_fitness=final_record.dominant_fitness,

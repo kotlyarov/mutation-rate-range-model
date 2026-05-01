@@ -171,14 +171,19 @@ Classes with positive balance contribute to the benefit-led population line.
 Classes with negative balance contribute to the decay-led population line.
 Classes with exactly zero balance appear only in the total population count.
 
-### Total lineages evolved
+### Total lineages evolved and survived
 
 The top-level `total lineages evolved` metric is the cumulative number of
 mutation-bearing offspring lineages generated before viability filtering across
 generation transitions. No-mutation offspring continue an existing lineage and
 are not counted as new evolved lineages. The metric includes mutated lineages
-that survive and mutated lineages that later disappear. The generation 0
-starting population is not counted as produced during the run.
+that survive and mutated lineages that later disappear.
+
+The top-level `total lineages survived` metric sums the surviving
+`evolved_lineage_count` values carried by current lineage classes. It is a
+lineage count, not a mutated-population count, and must remain less than or
+equal to `total lineages evolved`. The generation 0 starting population is not
+counted as produced during the run.
 
 ## Modelling assumptions
 

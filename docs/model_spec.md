@@ -236,13 +236,45 @@ new_mutation_lineages_t =
 
 total_lineages_evolved_t =
   sum(new_mutation_lineages_1 ... new_mutation_lineages_t)
+
+total_lineages_survived_t =
+  sum(evolved_lineage_count for current surviving classes)
 ```
 
 No-mutation offspring continue an existing lineage and are not counted as new
-evolved lineages. The metric includes mutated offspring lineages that survive
-and mutated offspring lineages later lost to selection, extinction, or
-nonviability. Starting lineages at generation 0 are not counted as produced
-during the run.
+evolved lineages. New mutation offspring start with
+`evolved_lineage_count = offspring count`. No-mutation offspring inherit existing
+`evolved_lineage_count` proportionally from the parent class:
+
+```text
+inherited =
+  round(parent_evolved_lineage_count * offspring_count / parent_class_count)
+
+no_mutation_evolved_lineage_count =
+  0, if parent_evolved_lineage_count is 0
+  min(offspring_count, max(1, inherited)), otherwise
+```
+
+Selection downsamples `evolved_lineage_count` when it downsamples `class_count`:
+
+```text
+surviving_evolved_lineage_count =
+  0, if survivor_count is 0 or candidate_evolved_lineage_count is 0
+  min(candidate_evolved_lineage_count, survivor_count),
+    if survivor_count >= candidate_class_count
+  min(survivor_count, max(1, sampled)), otherwise
+
+sampled ~ Binomial(
+  candidate_evolved_lineage_count,
+  survivor_count / candidate_class_count
+)
+```
+
+The metric includes mutated offspring lineages that survive and mutated
+offspring lineages later lost to selection, extinction, or nonviability.
+`total_lineages_survived` is a lineage count, not a mutated-population count, so
+it must remain less than or equal to `total_lineages_evolved`. Starting lineages
+at generation 0 are not counted as produced during the run.
 
 ## Trajectory classification
 
@@ -294,8 +326,8 @@ final dominant lineage fitness
 final actual population size
 carrying capacity
 viable candidate population size
-final beneficial adoption fraction
 total lineages evolved
+total lineages survived
 whether any beneficial lineage survived
 whether beneficial adoption crossed the configured threshold
 whether mean fitness crossed the configured collapse threshold or population collapsed

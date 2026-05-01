@@ -27,6 +27,7 @@ def test_lineage_history_has_generation_axis_and_finite_metrics():
     assert history["generation"][0] == 0
     assert history["generation"][-1] == params.generations
     assert history["total_lineages_evolved"][0] == 0
+    assert history["total_lineages_survived"][0] == 0
     new_mutation_lineages = (
         history["neutral_mutation_offspring"]
         + history["harmful_mutation_offspring"]
@@ -42,6 +43,8 @@ def test_lineage_history_has_generation_axis_and_finite_metrics():
         assert np.all(np.isfinite(values.astype(float)))
     assert np.all(history["carrying_capacity"] == params.effective_population_size)
     assert np.all(history["actual_population_size"] <= params.effective_population_size)
+    assert np.all(history["total_lineages_survived"] <= history["actual_population_size"])
+    assert np.all(history["total_lineages_survived"] <= history["total_lineages_evolved"])
     assert np.all(history["actual_population_size"] <= history["viable_population_size"])
     assert np.all(history["viable_population_size"] <= history["candidate_population_size"])
     assert np.all(history["beneficial_dominant_population_size"] >= 0)
@@ -80,7 +83,31 @@ def test_no_mutation_offspring_do_not_count_as_new_lineages():
         for record in results.history[1:]
     )
     assert all(record.total_lineages_evolved == 0 for record in results.history)
+    assert all(record.total_lineages_survived == 0 for record in results.history)
     assert results.outcome.final_total_lineages_evolved == 0
+    assert results.outcome.final_total_lineages_survived == 0
+
+
+def test_neutral_mutation_lineages_count_as_surviving_evolved_lineages():
+    params = LineageParameters(
+        generations=1,
+        effective_population_size=100,
+        mutation_rate_multiplier=1.0,
+        beneficial_mutation_rate=0.0,
+        neutral_mutation_rate=1e9,
+        deleterious_mutation_rate=0.0,
+        random_seed=19,
+    )
+    results = simulate_lineage_survival(params)
+    record = results.history[-1]
+
+    assert record.neutral_mutation_offspring == params.effective_population_size
+    assert record.total_lineages_evolved == params.effective_population_size
+    assert record.total_lineages_survived == params.effective_population_size
+    assert (
+        results.outcome.final_total_lineages_survived
+        == params.effective_population_size
+    )
 
 
 def test_accumulated_state_carries_forward_across_generations():
@@ -288,6 +315,7 @@ def test_population_can_collapse_when_all_candidates_are_nonviable():
     assert first_generation.total_lineages_evolved == params.effective_population_size
     assert final_generation.actual_population_size == 0
     assert final_generation.total_lineages_evolved == params.effective_population_size
+    assert final_generation.total_lineages_survived == 0
     assert results.final_lineages == ()
     assert results.outcome.collapsed is True
     assert (
