@@ -4,9 +4,12 @@ This document describes how empirical data should eventually be used in the Muta
 
 ## Current status
 
-No curated dataset is currently included.
+The repository includes a small source registry, schema example, and an early
+processed Sprouffske et al. 2018 calibration dataset. These are data curation
+inputs, not validated fitted model parameters.
 
-The first implementation should not pretend that parameters are fitted to data.
+The current lineage model should not pretend that parameters are fitted to data
+until source validation, fitting, and uncertainty treatment are complete.
 
 ## Data goals
 
@@ -106,7 +109,8 @@ For each dataset:
 
 Real-data fitting should be added only after:
 
-- deterministic model functions are tested
+- the current lineage model functions are tested
+- core model functions are tested
 - source data is documented
 - validation plan is written
 - uncertainty treatment is defined

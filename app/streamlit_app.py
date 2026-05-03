@@ -1,4 +1,4 @@
-"""Minimal local Streamlit explorer for lineage survival."""
+"""Minimal local Streamlit explorer for explicit lineage survival."""
 
 from __future__ import annotations
 
@@ -22,39 +22,48 @@ def main() -> None:
     st.set_page_config(page_title="Mutation Rate Range Model", layout="wide")
     st.title("Mutation Rate Range Model")
     st.warning(
-        "Exploratory lineage-survival model only. Outputs are conditional on "
-        "the selected assumptions and are not validated biological estimates."
+        "Exploratory lineage mutation-selection model only. Outputs are "
+        "conditional on the selected assumptions and are not validated "
+        "biological estimates."
     )
 
     params = _sidebar_parameters()
+    if not st.sidebar.button("Run simulation", type="primary"):
+        st.info(
+            "Set model inputs in the sidebar, then run the simulation. The "
+            "full default explicit-lineage run is intentionally heavy and may "
+            "hit the runtime or lineage-count safety guard."
+        )
+        return
+
     try:
         results = simulate_lineage_survival(params)
     except (ParameterValidationError, ValueError) as exc:
-        st.error(f"Parameter error: {exc}")
+        st.error(f"Model run stopped: {exc}")
         return
 
     st.subheader("Single mutation-rate lineage run")
     st.caption(
-        "One run fixes the mutation-rate multiplier and follows surviving "
-        "lineage classes generation by generation."
+        "One run follows explicit lineages through repeated Mutation and "
+        "Selection events."
     )
 
     outcome = results.outcome
     cols = st.columns(5)
     cols[0].metric(
         "final population",
-        format_count_compact(outcome.final_actual_population_size),
-        f"cap {format_count_compact(outcome.carrying_capacity)}",
+        format_count_compact(outcome.final_population),
+        f"cap {format_count_compact(outcome.population_cap)}",
     )
     cols[1].metric("final mean fitness", f"{outcome.final_mean_fitness:.3g}")
     cols[2].metric("best lineage fitness", f"{outcome.final_best_fitness:.3g}")
     cols[3].metric(
-        "total lineages evolved",
-        format_count_compact(outcome.final_total_lineages_evolved),
+        "current lineages",
+        format_count_compact(outcome.final_current_lineage_count),
     )
     cols[4].metric(
-        "total lineages survived",
-        format_count_compact(outcome.final_total_lineages_survived),
+        "cumulative lineages",
+        format_count_compact(outcome.final_cumulative_lineage_counter),
     )
 
     st.caption(
@@ -65,28 +74,31 @@ def main() -> None:
     st.subheader("Run interpretation")
     st.write(
         {
-            "mutation_rate_multiplier": params.mutation_rate_multiplier,
-            "effective_population_size": params.effective_population_size,
-            "final_actual_population_size": outcome.final_actual_population_size,
-            "final_viable_population_size": outcome.final_viable_population_size,
-            "total_lineages_evolved": outcome.final_total_lineages_evolved,
-            "total_lineages_survived": outcome.final_total_lineages_survived,
-            "final_benefit_led_population_size": (
-                results.history[-1].beneficial_dominant_population_size
+            "mutation_rate": params.mutation_rate,
+            "seed_population": params.seed_population,
+            "population_cap": params.population_cap,
+            "final_population": outcome.final_population,
+            "final_current_lineage_count": outcome.final_current_lineage_count,
+            "final_cumulative_lineage_counter": (
+                outcome.final_cumulative_lineage_counter
             ),
-            "final_decay_led_population_size": (
-                results.history[-1].harmful_dominant_population_size
+            "final_benefit_led_population": (
+                results.history[-1].beneficial_lineage_population
+            ),
+            "final_harmful_led_population": (
+                results.history[-1].harmful_lineage_population
             ),
             "beneficial_survived": outcome.beneficial_survived,
             "beneficial_reached_adoption_threshold": outcome.beneficial_adopted,
             "collapsed": outcome.collapsed,
-            "final_lineage_classes": outcome.final_lineage_class_count,
-            "transition_probabilities": results.transition_probabilities.as_dict(),
+            "seed_category_probabilities": (
+                results.mutation_category_probabilities.as_dict()
+            ),
         }
     )
     st.caption(
-        "D is a scalar mutation-accumulation / genome-decay proxy, not a direct "
-        "measurement of every harmful mutation."
+        "Harmful and lethal mutation counts are simplified burden proxies, not "
+        "a full genome-integrity model."
     )
 
     with st.expander("Generation history", expanded=False):
@@ -95,7 +107,7 @@ def main() -> None:
             use_container_width=True,
         )
 
-    with st.expander("Final surviving lineage classes", expanded=False):
+    with st.expander("Final surviving lineages", expanded=False):
         st.dataframe(
             [lineage.__dict__ for lineage in results.final_lineages],
             use_container_width=True,
@@ -109,119 +121,85 @@ def _sidebar_parameters(defaults: LineageParameters | None = None) -> LineagePar
     st.sidebar.header("Model inputs")
 
     with st.sidebar.expander("Experimental setup", expanded=True):
-        mutation_rate_multiplier = st.number_input(
-            "mutation_rate_multiplier",
-            min_value=1e-9,
-            value=float(defaults.mutation_rate_multiplier),
-            format="%.6g",
+        seed_fitness = st.slider(
+            "seed_fitness",
+            min_value=0.0,
+            max_value=1.0,
+            value=float(defaults.seed_fitness),
+            step=0.01,
         )
-        effective_population_size = st.number_input(
-            "effective_population_size",
+        seed_population = st.number_input(
+            "seed_population",
             min_value=1,
-            value=int(defaults.effective_population_size),
+            value=int(defaults.seed_population),
+            step=10_000,
+        )
+        population_cap = st.number_input(
+            "population_cap",
+            min_value=1,
+            value=int(defaults.population_cap),
             step=10_000,
         )
         generations = st.number_input(
             "generations",
-            min_value=1,
+            min_value=0,
             value=int(defaults.generations),
             step=100,
         )
 
     with st.sidebar.expander("Mutation supply", expanded=True):
-        neutral_mutation_rate = st.number_input(
-            "neutral_mutation_rate",
+        mutation_rate = st.number_input(
+            "mutation_rate",
             min_value=0.0,
-            value=float(defaults.neutral_mutation_rate),
-            format="%.6g",
-        )
-        deleterious_mutation_rate = st.number_input(
-            "deleterious_mutation_rate",
-            min_value=0.0,
-            value=float(defaults.deleterious_mutation_rate),
+            value=float(defaults.mutation_rate),
             format="%.6g",
         )
         beneficial_mutation_rate = st.number_input(
             "beneficial_mutation_rate",
             min_value=0.0,
+            max_value=1.0,
             value=float(defaults.beneficial_mutation_rate),
             format="%.6g",
         )
-
-    with st.sidebar.expander("Mutation effects", expanded=True):
-        beneficial_effect_size = st.number_input(
-            "beneficial_effect_size",
-            min_value=0.0,
-            value=float(defaults.beneficial_effect_size),
-            format="%.6g",
-        )
-        decay_effect_size = st.number_input(
-            "decay_effect_size",
-            min_value=0.0,
-            value=float(defaults.decay_effect_size),
-            format="%.6g",
-        )
-        benefit_saturation = st.number_input(
-            "benefit_saturation",
-            min_value=0.0,
-            value=float(defaults.benefit_saturation),
-            format="%.6g",
-        )
-        robustness_decay_rate = st.number_input(
-            "robustness_decay_rate",
-            min_value=0.0,
-            value=float(defaults.robustness_decay_rate),
-            format="%.6g",
-        )
-        interference_strength = st.number_input(
-            "interference_strength",
-            min_value=0.0,
-            value=float(defaults.interference_strength),
-            format="%.6g",
-        )
-        interference_exponent = st.number_input(
-            "interference_exponent",
-            min_value=1e-9,
-            value=float(defaults.interference_exponent),
-            format="%.6g",
-        )
-
-    with st.sidebar.expander("Selection and survival", expanded=True):
-        selection_strength = st.number_input(
-            "selection_strength",
-            min_value=0.0,
-            value=float(defaults.selection_strength),
-            format="%.6g",
-        )
-        viability_fitness_threshold = st.number_input(
-            "viability_fitness_threshold",
-            min_value=0.0,
-            value=float(defaults.viability_fitness_threshold),
-            format="%.6g",
-        )
-        lethal_decay_threshold = st.number_input(
-            "lethal_decay_threshold",
-            min_value=0.0,
-            value=float(defaults.lethal_decay_threshold),
-            format="%.6g",
-        )
-        minimum_viable_robustness = st.number_input(
-            "minimum_viable_robustness",
+        harmful_mutation_rate = st.number_input(
+            "harmful_mutation_rate",
             min_value=0.0,
             max_value=1.0,
-            value=float(defaults.minimum_viable_robustness),
+            value=float(defaults.harmful_mutation_rate),
             format="%.6g",
         )
-        decay_fitness_penalty = st.number_input(
-            "decay_fitness_penalty",
+        lethal_mutation_rate = st.number_input(
+            "lethal_mutation_rate",
             min_value=0.0,
-            value=float(defaults.decay_fitness_penalty),
+            max_value=1.0,
+            value=float(defaults.lethal_mutation_rate),
             format="%.6g",
         )
-        robustness_fitness_weight = st.number_input(
-            "robustness_fitness_weight",
+        compound_effect = st.number_input(
+            "compound_effect",
             min_value=0.0,
-            value=float(defaults.robustness_fitness_weight),
+            value=float(defaults.compound_effect),
+            format="%.6g",
+        )
+
+    with st.sidebar.expander("Selection process", expanded=True):
+        mutation_effect = st.number_input(
+            "mutation_effect",
+            min_value=0.0,
+            value=float(defaults.mutation_effect),
+            format="%.6g",
+        )
+        minimum_fitness = st.slider(
+            "minimum_fitness",
+            min_value=0.0,
+            max_value=1.0,
+            value=float(defaults.minimum_fitness),
+            step=0.01,
+        )
+        randomness = st.number_input(
+            "randomness",
+            min_value=0.0,
+            value=float(defaults.randomness),
             format="%.6g",
         )
         beneficial_adoption_threshold = st.slider(
@@ -246,35 +224,37 @@ def _sidebar_parameters(defaults: LineageParameters | None = None) -> LineagePar
             value=int(defaults.random_seed or 0),
             step=1,
         )
+        max_runtime_seconds = st.number_input(
+            "max_runtime_seconds",
+            min_value=0.1,
+            value=float(defaults.max_runtime_seconds),
+            step=1.0,
+            format="%.3g",
+        )
         max_lineage_classes = st.number_input(
             "max_lineage_classes",
             min_value=1,
             value=int(defaults.max_lineage_classes),
-            step=500,
+            step=10_000,
         )
 
     return LineageParameters(
-        mutation_rate_multiplier=mutation_rate_multiplier,
-        effective_population_size=int(effective_population_size),
+        seed_fitness=seed_fitness,
+        seed_population=int(seed_population),
+        population_cap=int(population_cap),
         generations=int(generations),
+        mutation_rate=mutation_rate,
         beneficial_mutation_rate=beneficial_mutation_rate,
-        neutral_mutation_rate=neutral_mutation_rate,
-        deleterious_mutation_rate=deleterious_mutation_rate,
-        beneficial_effect_size=beneficial_effect_size,
-        decay_effect_size=decay_effect_size,
-        benefit_saturation=benefit_saturation,
-        interference_strength=interference_strength,
-        interference_exponent=interference_exponent,
-        robustness_decay_rate=robustness_decay_rate,
-        decay_fitness_penalty=decay_fitness_penalty,
-        robustness_fitness_weight=robustness_fitness_weight,
-        selection_strength=selection_strength,
-        viability_fitness_threshold=viability_fitness_threshold,
-        lethal_decay_threshold=lethal_decay_threshold,
-        minimum_viable_robustness=minimum_viable_robustness,
+        harmful_mutation_rate=harmful_mutation_rate,
+        lethal_mutation_rate=lethal_mutation_rate,
+        compound_effect=compound_effect,
+        mutation_effect=mutation_effect,
+        minimum_fitness=minimum_fitness,
+        randomness=randomness,
         beneficial_adoption_threshold=beneficial_adoption_threshold,
         collapse_fitness_threshold=collapse_fitness_threshold,
         random_seed=int(random_seed),
+        max_runtime_seconds=max_runtime_seconds,
         max_lineage_classes=int(max_lineage_classes),
     )
 
@@ -284,175 +264,125 @@ def _render_model_audit(results) -> None:
     final_record = results.history[-1]
 
     with st.expander("Model audit", expanded=False):
-        st.subheader("Formulas")
+        st.subheader("Final formulas")
         st.code(
             "\n".join(
                 [
-                    "r_b = beneficial_mutation_rate * mutation_rate_multiplier",
-                    "r_h = deleterious_mutation_rate * mutation_rate_multiplier",
-                    "r_n = neutral_mutation_rate * mutation_rate_multiplier",
-                    "p_event = 1 - exp(-r_event)",
-                    "no_new_mutation = (1 - p_b) * (1 - p_h) * (1 - p_n)",
-                    "neutral = (1 - p_b) * (1 - p_h) * p_n",
-                    "harmful = (1 - p_b) * p_h",
-                    "beneficial = p_b * (1 - p_h)",
-                    "mixed = p_b * p_h",
-                    "the same class probabilities apply to every lineage each generation",
-                    "has_beneficial does not reduce future harmful or mixed exposure",
+                    "Mutation multiplicity:",
+                    "  K ~ Poisson(lambda = mutation_rate)",
+                    "  K = number of new mutations in one bacterium during one Mutation event",
                     "",
-                    "interference = 1 / (1 + interference_strength * load^interference_exponent)",
-                    "B_next = B_inherited + min(benefit_saturation - B_inherited, beneficial_effect_size * interference)",
-                    "D_next = D_inherited + decay_effect_size for harmful or mixed offspring",
-                    "R_next = exp(-robustness_decay_rate * D_next)",
-                    "performance_fitness = max(0, 1 + B - decay_fitness_penalty * D)",
-                    "robustness_modifier = max(0, 1 - robustness_fitness_weight * (1 - R))",
-                    "fitness = performance_fitness * robustness_modifier",
-                    "decay_pressure = decay_fitness_penalty * D",
-                    "benefit_decay_balance = B - decay_pressure",
-                    "new_mutation_lineages = neutral + harmful + beneficial + mixed offspring",
-                    "total_lineages_evolved_next = total_lineages_evolved_prior + new_mutation_lineages",
-                    "total_lineages_survived = sum(evolved_lineage_count for surviving classes)",
+                    "Compound-effect category weights for each new mutation:",
+                    "  compound_multiplier = 1 + total_mutations_before * compound_effect",
+                    "  beneficial_weight = beneficial_mutation_rate * compound_multiplier",
+                    "  harmful_weight = harmful_mutation_rate * compound_multiplier",
+                    "  lethal_weight = lethal_mutation_rate * compound_multiplier",
+                    "  neutral_weight = 1",
+                    "  denominator = beneficial_weight + harmful_weight + lethal_weight + neutral_weight",
+                    "  p_beneficial = beneficial_weight / denominator",
+                    "  p_harmful = harmful_weight / denominator",
+                    "  p_lethal = lethal_weight / denominator",
+                    "  p_neutral = neutral_weight / denominator",
                     "",
-                    "viable = fitness >= viability_fitness_threshold and D <= lethal_decay_threshold and R >= minimum_viable_robustness",
-                    "competitive_weight = 0 if not viable else class_count * fitness ** selection_strength",
-                    "next_population_size = min(carrying_capacity, viable_population_size)",
-                    "next class counts are sampled in proportion to competitive_weight",
+                    "Lineage fitness:",
+                    "  fitness = seed_fitness + (beneficial_mutations - harmful_mutations) * mutation_effect",
+                    "  current limitation: this formula can leave the [0, 1] range",
+                    "",
+                    "Selection:",
+                    "  remove lineages with lethal_mutations > 0",
+                    "  size = size * 2 for remaining lineages",
+                    "  remove lineages with fitness < minimum_fitness",
+                    "  mean_fitness = sum(size * fitness) / sum(size)",
+                    "",
+                    "Population cap when total population exceeds population_cap:",
+                    "  adjusted_fitness = max(0, fitness + Normal(0, randomness))",
+                    "  selection_weight = size * adjusted_fitness",
+                    "  target_size = population_cap * selection_weight / sum(selection_weight)",
+                    "  size = round(target_size) to the closest integer",
+                    "  rounded total may go slightly above or below population_cap",
                 ]
             ),
             language="text",
         )
 
-        st.subheader("Trajectory classification")
+        st.subheader("Lineage state")
         st.code(
             "\n".join(
                 [
-                    "mostly_beneficial = benefit_decay_balance > 0",
-                    "mostly_harmful_or_negative = benefit_decay_balance < 0",
-                    "neutral_or_exactly_balanced = benefit_decay_balance == 0",
-                    "benefit_led_population = sum(class_count for mostly_beneficial surviving classes)",
-                    "decay_led_population = sum(class_count for mostly_harmful_or_negative surviving classes)",
-                    "total_population = sum(class_count for all surviving classes)",
-                    "classification uses surviving population counts, not fractions",
+                    "lineage_id",
+                    "generation_created",
+                    "total_mutations",
+                    "beneficial_mutations",
+                    "harmful_mutations",
+                    "lethal_mutations",
+                    "size",
+                    "fitness_score",
                 ]
             ),
             language="text",
         )
-
-        st.subheader("Population-cap logic")
-        st.code(
-            "\n".join(
-                [
-                    "carrying_capacity = effective_population_size",
-                    "candidate_population_size = actual_population_size from previous generation",
-                    "discard candidate classes below fitness, decay, or robustness viability gates",
-                    "viable_population_size = sum(counts for viable candidate classes)",
-                    "above viability, higher fitness changes competitive share without increasing population size",
-                    "sample next class counts with Multinomial(next_population_size, competitive_weight / sum(competitive_weight))",
-                    "actual_population_size_next = sum(survivors)",
-                    "actual_population_size_next <= viable_population_size <= candidate_population_size",
-                    "actual_population_size_next may be below carrying_capacity",
-                    "no below-threshold lineage survives because empty capacity exists",
-                    "collapse is possible when actual_population_size_next is zero",
-                ]
-            ),
-            language="text",
-        )
-
-        st.subheader("Lineage-production accounting")
-        st.code(
-            "\n".join(
-                [
-                    "generation_0_total_lineages_evolved = 0",
-                    "no_mutation_offspring continue an existing lineage and are not counted as new evolved lineages",
-                    "new_mutation_lineages = neutral_mutation_offspring + harmful_mutation_offspring + beneficial_mutation_offspring + mixed_mutation_offspring",
-                    "mutation offspring: evolved_lineage_count_next = offspring_count",
-                    "no-mutation offspring with no parent evolved lineages: evolved_lineage_count_next = 0",
-                    "no-mutation offspring otherwise: inherited = round(parent_evolved_lineage_count * offspring_count / parent_class_count)",
-                    "no-mutation offspring otherwise: evolved_lineage_count_next = min(offspring_count, max(1, inherited))",
-                    "after selection, if survivor_count is 0 or candidate_evolved_lineage_count is 0: surviving_evolved_lineage_count = 0",
-                    "after selection, if survivor_count >= candidate_class_count: surviving_evolved_lineage_count = min(candidate_evolved_lineage_count, survivor_count)",
-                    "after selection otherwise: sampled = Binomial(candidate_evolved_lineage_count, survivor_count / candidate_class_count)",
-                    "after selection otherwise: surviving_evolved_lineage_count = min(survivor_count, max(1, sampled))",
-                    "total_lineages_evolved = cumulative sum(new_mutation_lineages over generation transitions)",
-                    "total_lineages_survived = sum(evolved_lineage_count for final surviving classes)",
-                    "total_lineages_survived <= total_lineages_evolved",
-                    "the count includes mutated offspring lineages that survive and mutated offspring lineages later lost to selection, extinction, or nonviability",
-                    "starting lineages at generation 0 are not counted as produced during the run",
-                ]
-            ),
-            language="text",
-        )
-
-        st.subheader("Current transition probabilities")
-        st.write(results.transition_probabilities.as_dict())
 
         st.subheader("Final generation accounting")
         st.write(
             {
-                "carrying_capacity": final_record.carrying_capacity,
-                "candidate_population_size": final_record.candidate_population_size,
-                "total_lineages_evolved": final_record.total_lineages_evolved,
-                "total_lineages_survived": final_record.total_lineages_survived,
-                "viable_population_size": final_record.viable_population_size,
-                "viable_lineage_class_count": final_record.viable_lineage_class_count,
-                "actual_population_size": final_record.actual_population_size,
-                "benefit_led_population": (
-                    final_record.beneficial_dominant_population_size
+                "population_cap": final_record.population_cap,
+                "total_population": final_record.total_population,
+                "pre_cap_population": final_record.pre_cap_population,
+                "lineage_count_current": final_record.lineage_count_current,
+                "lineage_counter_cumulative": (
+                    final_record.lineage_counter_cumulative
                 ),
-                "decay_led_population": (
-                    final_record.harmful_dominant_population_size
+                "beneficial_lineage_population": (
+                    final_record.beneficial_lineage_population
                 ),
-                "lineage_class_count": final_record.lineage_class_count,
+                "harmful_lineage_population": final_record.harmful_lineage_population,
+                "neutral_or_balanced_population": (
+                    final_record.neutral_or_balanced_population
+                ),
+                "population_over_cap": final_record.population_over_cap,
+                "runtime_seconds": final_record.runtime_seconds,
             }
         )
 
-        st.subheader("Beneficial-lineage mutation exposure")
+        st.subheader("Mutation accounting")
         st.write(
             {
-                "beneficial_parent_population_size": (
-                    final_record.beneficial_parent_population_size
+                "mutation_lineages_created": (
+                    final_record.mutation_lineages_created
                 ),
-                "beneficial_parent_no_mutation_offspring": (
-                    final_record.beneficial_parent_no_mutation_offspring
+                "one_mutation_lineages_created": (
+                    final_record.one_mutation_lineages_created
                 ),
-                "beneficial_parent_neutral_mutation_offspring": (
-                    final_record.beneficial_parent_neutral_mutation_offspring
+                "multi_mutation_lineages_created": (
+                    final_record.multi_mutation_lineages_created
                 ),
-                "beneficial_parent_harmful_mutation_offspring": (
-                    final_record.beneficial_parent_harmful_mutation_offspring
+                "new_mutations_total": final_record.new_mutations_total,
+                "beneficial_mutation_count_total": (
+                    final_record.beneficial_mutation_count_total
                 ),
-                "beneficial_parent_beneficial_mutation_offspring": (
-                    final_record.beneficial_parent_beneficial_mutation_offspring
+                "harmful_mutation_count_total": (
+                    final_record.harmful_mutation_count_total
                 ),
-                "beneficial_parent_mixed_mutation_offspring": (
-                    final_record.beneficial_parent_mixed_mutation_offspring
+                "neutral_mutation_count_total": (
+                    final_record.neutral_mutation_count_total
                 ),
-                "beneficial_parent_decay_exposed_offspring": (
-                    final_record.beneficial_parent_harmful_mutation_offspring
-                    + final_record.beneficial_parent_mixed_mutation_offspring
+                "lethal_lineages_removed": final_record.lethal_lineages_removed,
+                "low_fitness_lineages_removed": (
+                    final_record.low_fitness_lineages_removed
                 ),
+                "post_cap_lineages_removed": final_record.post_cap_lineages_removed,
             }
         )
-        st.caption(
-            "These counts are offspring from parents that already had at least "
-            "one beneficial mutation before the generation transition."
-        )
+
+        st.subheader("Seed-lineage category probabilities")
+        st.write(results.mutation_category_probabilities.as_dict())
 
         st.subheader("Advanced simulation controls")
         st.write(
             {
                 "random_seed": params.random_seed,
+                "max_runtime_seconds": params.max_runtime_seconds,
                 "max_lineage_classes": params.max_lineage_classes,
-            }
-        )
-
-        st.subheader("Reporting thresholds")
-        st.write(
-            {
-                "beneficial_adoption_threshold": (
-                    params.beneficial_adoption_threshold
-                ),
-                "collapse_fitness_threshold": params.collapse_fitness_threshold,
             }
         )
 
@@ -476,24 +406,18 @@ def _render_model_audit(results) -> None:
 
 def _audit_rows(params: LineageParameters) -> list[dict[str, object]]:
     biological_inputs = {
-        "mutation_rate_multiplier": "experimental setup",
-        "effective_population_size": "experimental setup",
+        "seed_fitness": "experimental setup",
+        "seed_population": "experimental setup",
+        "population_cap": "experimental setup",
         "generations": "experimental setup",
+        "mutation_rate": "mutation supply",
         "beneficial_mutation_rate": "mutation supply",
-        "neutral_mutation_rate": "mutation supply",
-        "deleterious_mutation_rate": "mutation supply",
-        "beneficial_effect_size": "mutation effect",
-        "decay_effect_size": "mutation effect",
-        "benefit_saturation": "mutation effect",
-        "interference_strength": "interaction",
-        "interference_exponent": "interaction",
-        "robustness_decay_rate": "robustness",
-        "decay_fitness_penalty": "fitness",
-        "robustness_fitness_weight": "fitness",
-        "selection_strength": "survival",
-        "viability_fitness_threshold": "survival",
-        "lethal_decay_threshold": "survival",
-        "minimum_viable_robustness": "survival",
+        "harmful_mutation_rate": "mutation supply",
+        "lethal_mutation_rate": "mutation supply",
+        "compound_effect": "mutation supply",
+        "mutation_effect": "selection process",
+        "minimum_fitness": "selection process",
+        "randomness": "selection process",
     }
     reporting_inputs = {
         "beneficial_adoption_threshold": "reporting threshold",
@@ -501,6 +425,7 @@ def _audit_rows(params: LineageParameters) -> list[dict[str, object]]:
     }
     simulation_inputs = {
         "random_seed": "reproducibility",
+        "max_runtime_seconds": "computational safety",
         "max_lineage_classes": "computational safety",
     }
 

@@ -117,21 +117,30 @@ def validate_parameters(params: Any) -> None:
 def validate_lineage_parameters(params: Any) -> None:
     """Validate a LineageParameters-like object."""
 
-    mutation_rate_multiplier = _require_positive(
-        "mutation_rate_multiplier",
-        params.mutation_rate_multiplier,
-    )
+    _require_fraction("seed_fitness", params.seed_fitness)
 
-    if isinstance(params.effective_population_size, bool) or not isinstance(
-        params.effective_population_size,
+    if isinstance(params.seed_population, bool) or not isinstance(
+        params.seed_population,
         numbers.Integral,
     ):
-        raise ParameterValidationError("effective_population_size must be an integer.")
-    if params.effective_population_size < 1:
-        raise ParameterValidationError("effective_population_size must be at least 1.")
-    if params.effective_population_size > MAX_POPULATION_SIZE:
+        raise ParameterValidationError("seed_population must be an integer.")
+    if params.seed_population < 1:
+        raise ParameterValidationError("seed_population must be at least 1.")
+    if params.seed_population > MAX_POPULATION_SIZE:
         raise ParameterValidationError(
-            f"effective_population_size must be <= {MAX_POPULATION_SIZE}."
+            f"seed_population must be <= {MAX_POPULATION_SIZE}."
+        )
+
+    if isinstance(params.population_cap, bool) or not isinstance(
+        params.population_cap,
+        numbers.Integral,
+    ):
+        raise ParameterValidationError("population_cap must be an integer.")
+    if params.population_cap < 1:
+        raise ParameterValidationError("population_cap must be at least 1.")
+    if params.population_cap > MAX_POPULATION_SIZE:
+        raise ParameterValidationError(
+            f"population_cap must be <= {MAX_POPULATION_SIZE}."
         )
 
     if isinstance(params.generations, bool) or not isinstance(
@@ -139,28 +148,19 @@ def validate_lineage_parameters(params: Any) -> None:
         numbers.Integral,
     ):
         raise ParameterValidationError("generations must be an integer.")
-    if params.generations < 1:
-        raise ParameterValidationError("generations must be at least 1.")
+    if params.generations < 0:
+        raise ParameterValidationError("generations must be non-negative.")
     if params.generations > MAX_GENERATIONS:
         raise ParameterValidationError(f"generations must be <= {MAX_GENERATIONS}.")
 
-    _require_nonnegative("beneficial_mutation_rate", params.beneficial_mutation_rate)
-    _require_nonnegative("neutral_mutation_rate", params.neutral_mutation_rate)
-    _require_nonnegative("deleterious_mutation_rate", params.deleterious_mutation_rate)
-    _require_nonnegative("beneficial_effect_size", params.beneficial_effect_size)
-    _require_nonnegative("decay_effect_size", params.decay_effect_size)
-
-    _require_nonnegative("benefit_saturation", params.benefit_saturation)
-    _require_nonnegative("interference_strength", params.interference_strength)
-    _require_positive("interference_exponent", params.interference_exponent)
-
-    _require_nonnegative("robustness_decay_rate", params.robustness_decay_rate)
-    _require_nonnegative("decay_fitness_penalty", params.decay_fitness_penalty)
-    _require_nonnegative("robustness_fitness_weight", params.robustness_fitness_weight)
-    _require_nonnegative("lethal_decay_threshold", params.lethal_decay_threshold)
-    _require_fraction("minimum_viable_robustness", params.minimum_viable_robustness)
-    _require_nonnegative("selection_strength", params.selection_strength)
-    _require_nonnegative("viability_fitness_threshold", params.viability_fitness_threshold)
+    _require_nonnegative("mutation_rate", params.mutation_rate)
+    _require_fraction("beneficial_mutation_rate", params.beneficial_mutation_rate)
+    _require_fraction("harmful_mutation_rate", params.harmful_mutation_rate)
+    _require_fraction("lethal_mutation_rate", params.lethal_mutation_rate)
+    _require_nonnegative("compound_effect", params.compound_effect)
+    _require_nonnegative("mutation_effect", params.mutation_effect)
+    _require_fraction("minimum_fitness", params.minimum_fitness)
+    _require_nonnegative("randomness", params.randomness)
     _require_fraction(
         "beneficial_adoption_threshold",
         params.beneficial_adoption_threshold,
@@ -172,6 +172,8 @@ def validate_lineage_parameters(params: Any) -> None:
         or not isinstance(params.random_seed, numbers.Integral)
     ):
         raise ParameterValidationError("random_seed must be an integer or None.")
+
+    _require_positive("max_runtime_seconds", params.max_runtime_seconds)
 
     if isinstance(params.max_lineage_classes, bool) or not isinstance(
         params.max_lineage_classes,
@@ -186,30 +188,14 @@ def validate_lineage_parameters(params: Any) -> None:
         )
 
     _require_safe_product(
-        "beneficial event rate",
-        params.beneficial_mutation_rate,
-        mutation_rate_multiplier,
+        "maximum expected new mutations",
+        params.mutation_rate,
+        float(max(params.seed_population, params.population_cap)),
     )
     _require_safe_product(
-        "neutral event rate",
-        params.neutral_mutation_rate,
-        mutation_rate_multiplier,
-    )
-    _require_safe_product(
-        "deleterious event rate",
-        params.deleterious_mutation_rate,
-        mutation_rate_multiplier,
-    )
-    _require_safe_product(
-        "maximum accumulated lineage decay",
+        "maximum lineage mutation effect",
         float(params.generations),
-        params.decay_effect_size,
-    )
-    _require_safe_product(
-        "maximum weighted lineage decay",
-        float(params.generations),
-        params.decay_effect_size,
-        params.decay_fitness_penalty,
+        params.mutation_effect,
     )
 
 

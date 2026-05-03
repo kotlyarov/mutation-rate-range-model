@@ -11,9 +11,9 @@ Sprouffske et al. 2018 supplementary S3 genomic mutation-rate values and Dryad
 growth-curve relative-fitness observations.
 
 These files are raw experimental inputs for calibration, not validated
-biological conclusions. The deterministic model should continue to work while
-showing which parameters are fitted from observations and which remain assumed
-or unsupported.
+biological conclusions. The current lineage model should continue to show
+which parameters are fitted from observations and which remain assumed or
+unsupported.
 
 ## Directory structure
 

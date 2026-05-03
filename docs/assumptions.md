@@ -1,246 +1,269 @@
 # Assumptions
 
-This document lists assumptions used by the current Mutation Rate Range Model.
+This document lists assumptions for the current explicit lineage
+mutation-selection model.
 
-## General assumptions
+Status:
+
+```text
+implemented lineage model
+exploratory and uncalibrated
+```
+
+## General Assumptions
 
 The model assumes:
 
 - an *E. coli*-like asexual population
-- mutation rate is represented as a multiplier relative to wild type
-- one lineage run uses one fixed mutation-rate multiplier
-- effective population size is a carrying-capacity limit for stochastic mutation
-  and survival sampling
-- selected-environment benefit and genome integrity remain conceptually separate
-- outputs are exploratory trajectories, not exact biological measurements
-- results are conditional on parameter choices and random seed
+- one stable selected environment during the run
+- one seed lineage at generation 0
+- integer population sizes and explicit lineage records
+- generation-by-generation Mutation and Selection events
+- results are exploratory trajectories, not exact biological measurements
+- results are conditional on parameter choices and unresolved modelling choices
 
-## Biological assumptions
+The model must not imply that it has found a true universal optimal mutation
+rate.
 
-### Asexual population
+## Biological Assumptions
+
+### Asexual Population
 
 The model assumes no recombination.
 
 This is useful for a simplified LTEE-like setting, but it limits generality.
 
-### Constant selected environment
+### Constant Selected Environment
 
 The selected environment is treated as stable across the generation horizon.
 
-This allows selected-environment fitness gain to be modelled separately from
-retained robustness.
+Fitness is therefore a selected-environment score. It is not a general measure
+of performance across all environments.
 
-### Mutation-rate multiplier
+### Seed Fitness
 
-Mutation rate is represented as:
+`seed_fitness` is the selected-environment fitness of the founding lineage.
+
+The default value is provisional. It is not fitted to data.
+
+### Mutation Supply
+
+`mutation_rate` controls the expected number of new mutations per bacterium
+during the Mutation event.
+
+For small values, `mutation_rate` can be read approximately as the fraction of
+the lineage that mutates in one event. For larger values or for multiple
+mutations per descendant, it must be treated as a count-distribution parameter,
+not a simple percent.
+
+Mutation multiplicity is modelled as:
 
 ```text
-mutation_rate_multiplier = mutation rate relative to wild type
+K ~ Poisson(lambda = mutation_rate)
 ```
 
-The single-run lineage model does not evaluate mutation rate on the X axis.
-Instead, it fixes the multiplier and tracks lineage survival over generations.
+### Mutation Categories
 
-### Mutation classes
-
-Each generation splits offspring into high-level classes:
+Each new mutation is classified as:
 
 ```text
-no new mutation
-neutral mutation
-harmful mutation / decay
-beneficial mutation
-mixed beneficial plus harmful mutation
+beneficial
+harmful
+lethal
+neutral
 ```
 
-The same mutation-class split is applied to all surviving lineage classes each
-generation. A lineage that already has beneficial state can still produce
-harmful and mixed descendants in later generations.
-
-These are aggregate classes. The model does not initially distinguish:
+These are high-level categories. The model does not initially distinguish:
 
 - point mutations
 - indels
 - structural variants
-- spectrum changes
-- context-dependent mutation biases
+- repair-pathway changes
+- mutation-spectrum shifts
+- mutation context
+- gene-specific effects
 
-Later versions may separate mutation rate and mutation spectrum.
+### Beneficial Mutations
 
-### Effective population size
+Beneficial mutations increase selected-environment fitness through the current
+linear fitness formula.
 
-Effective population size is modelled as a hard carrying-capacity limit through
-integer stochastic sampling.
+This does not mean every beneficial mutation has the same true biological
+effect. It is a first-pass scoring assumption.
 
-Tiny expected probabilities do not create fractional lineage classes. A rare
-class appears only if a random mutation draw creates at least one offspring and
-then a survival draw leaves at least one survivor.
+### Harmful Mutations
 
-The actual population size can be lower than the carrying capacity if candidate
-lineages are nonviable or fail survival selection.
+Harmful mutations reduce selected-environment fitness through the current
+linear fitness formula.
 
-### Adaptive benefit
+They also serve as a simplified genome-integrity burden proxy. This proxy is
+not a literal count of every biologically damaging event and does not separate
+all possible costs.
 
-Accumulated selected-environment benefit is represented as `B`.
+### Lethal Mutations
 
-Beneficial mutations add increments to inherited benefit until the configured
-`benefit_saturation` is reached. This is a saturation assumption, not a claim
-that all beneficial mutations share one real effect size.
+Any lineage with one or more lethal mutations is removed at the next Selection
+event.
 
-### Genome decay proxy
+This makes lethality a lineage-level viability gate rather than a gradual
+fitness penalty.
 
-Accumulated harmful mutation pressure and genome-integrity loss are represented
-by a scalar proxy:
+### Neutral Mutations
 
-```text
-D
-```
+Neutral mutations increase `total_mutations` but do not directly alter the
+fitness formula.
 
-`D` is not a direct count of deleterious mutations and not a direct measurement
-of lost genes.
+They can still affect future mutation-category probabilities through the
+compound-effect formula because they contribute to `total_mutations`.
 
-### Robustness
+### Compound Effect
 
-Retained robustness is represented as:
-
-```text
-R = exp(-robustness_decay_rate * D)
-```
-
-It is a bounded proxy for the ability to retain performance outside the selected
-environment.
-
-### Interference
-
-New beneficial effects are reduced by interference from inherited decay and, in
-mixed cases, newly acquired harmful decay:
+The compound-effect formula increases the raw category weights as the
+inherited mutation count grows:
 
 ```text
-interference_load = inherited_decay + new_harmful_decay
+category_weight =
+  base_category_rate * (1 + total_mutations * compound_effect)
 ```
 
-This is a transparent approximation. It is not a full clonal-interference,
-epistasis, or distribution-of-fitness-effects model.
+The resulting beneficial, harmful, lethal, and neutral weights are normalized
+to probabilities before category assignment.
+
+This assumes that lineages with more accumulated mutations become more likely
+to produce beneficial, harmful, or lethal category assignments. The assumption
+is biologically strong, and normalization changes the category rates from direct
+probabilities into relative weights.
 
 ### Fitness
 
-Lineage fitness is calculated from inherited state:
+Fitness is calculated with the current linear formula:
 
 ```text
-performance_fitness = max(0, 1 + B - decay_fitness_penalty * D)
-robustness_modifier = max(0, 1 - robustness_fitness_weight * (1 - R))
-fitness = performance_fitness * robustness_modifier
+fitness_score =
+  seed_fitness
+  + (beneficial_mutations - harmful_mutations) * mutation_effect
 ```
 
-The starting generation has fitness 1.0. Robustness does not add back fitness
-or cancel accumulated decay. It only reduces performance as robustness declines.
-Selected-environment benefit, decay proxy, and retained robustness remain
-separately reported even though survival selection uses the combined fitness.
+This is deliberately simple. It can produce values outside `[0, 1]`, so future
+model review should decide how to keep fitness within intended score boundaries
+without masking useful behavior.
 
-### Survival selection
+### Population Growth
 
-Survival selection is stochastic. Candidate offspring classes are sampled from
-the current lineage classes. Candidate classes below
-`viability_fitness_threshold`, above `lethal_decay_threshold`, or below
-`minimum_viable_robustness` are removed. Viable classes receive competitive
-weight proportional to:
+After lethal filtering, surviving lineage populations double during Selection:
 
 ```text
-class_count * fitness^selection_strength
+size = size * 2
 ```
 
-The next generation size is capped by the viable offspring count and by
-`effective_population_size`. The competitive weights only determine how that
-viable population is distributed among lineage classes. Fitness above 1 is not
-converted into a capped survival probability and does not create replacement
-population after lethal filtering, but it can still improve lineage share.
+The model does not yet simulate nutrient concentration, lag phase, growth-rate
+curves, culture volume, or serial-transfer dilution.
 
-The model does not reset biological state each generation. Surviving classes
-carry accumulated benefit, accumulated decay, robustness, and fitness forward.
+### Minimum Fitness
 
-### Trajectory categories
-
-The main trajectory chart reports population counts, not only fitness or
-fractions. Surviving lineage classes are classified by the sign of:
+Lineages with:
 
 ```text
-benefit_decay_balance = B - decay_fitness_penalty * D
+fitness_score < minimum_fitness
 ```
 
-Classes with positive balance contribute to the benefit-led population line.
-Classes with negative balance contribute to the decay-led population line.
-Classes with exactly zero balance appear only in the total population count.
+are removed.
 
-### Total lineages evolved and survived
+This is a hard viability threshold, not a fitted experimental extinction rule.
 
-The top-level `total lineages evolved` metric is the cumulative number of
-mutation-bearing offspring lineages generated before viability filtering across
-generation transitions. No-mutation offspring continue an existing lineage and
-are not counted as new evolved lineages. The metric includes mutated lineages
-that survive and mutated lineages that later disappear.
+### Population Cap
 
-The top-level `total lineages survived` metric sums the surviving
-`evolved_lineage_count` values carried by current lineage classes. It is a
-lineage count, not a mutated-population count, and must remain less than or
-equal to `total lineages evolved`. The generation 0 starting population is not
-counted as produced during the run.
+If the total population exceeds `population_cap`, the default is linear soft
+selection:
 
-## Modelling assumptions
+```text
+selection_weight = size * fitness_score
+```
 
-### Aggregated lineage classes
+The cap is then allocated across lineages in proportion to selection weights.
 
-The model tracks aggregated lineage classes rather than individual organisms.
+This is preferred over squaring fitness in the first rewrite because it is
+simpler and less aggressive. A stronger exponent should be added only as a
+named, reviewed parameter.
 
-This keeps the implementation transparent and fast enough for local exploration,
-but it is still an approximation. If the number of surviving classes exceeds
-the advanced `max_lineage_classes` simulation control, small classes are merged
-into a weighted aggregate class.
+### Randomness
 
-### Carrying-capacity-limited population size
+The requested `randomness` parameter is intended to make survival less
+deterministic.
 
-Each generation can contain at most `effective_population_size` survivors. The
-model does not automatically refill empty capacity after selection, and the
-actual population can decline or collapse. The current model still does not
-simulate explicit resource growth, dilution protocols, culture volume, or
-carrying-capacity dynamics.
+The exact rule is not defined yet. Any stochastic use of `randomness` should use
+the retained `random_seed` so runs can be reproduced.
 
-### Seeded randomness
+## Modelling Assumptions
 
-Runs are stochastic but can be reproduced with the advanced `random_seed`
-simulation control.
+### Explicit Lineages
 
-Changing the seed can change whether rare lineages appear, survive, or disappear.
-Scientific interpretation should use repeated runs, especially once mutation-rate
-sweeps are added.
+The current lineage model tracks explicit lineages rather than aggregated lineage
+classes.
 
-### Defaults are not fitted values
+This makes lineage accounting easier to understand but can cause explosive
+lineage growth. The implementation includes a 60-second runtime
+limit and should discard temporary arrays and removed lineages once their
+summary counts have been recorded.
+
+### Integer Population Counts
+
+All lineage sizes are integer counts.
+
+Any proportional cap selection must therefore use documented closest-integer
+rounding. The rounded total may be slightly above or below `population_cap`.
+
+### Mean Fitness
+
+Mean fitness is population-weighted:
+
+```text
+mean_fitness =
+  sum(size * fitness_score) / sum(size)
+```
+
+If cap selection changes lineage composition, the model should report whether
+mean fitness is measured before cap selection, after cap selection, or both.
+
+### Defaults Are Not Fitted Values
 
 Default parameters are placeholders for model exploration.
 
 They must not be described as inferred from real data unless fitting code and
 validation reports are later added.
 
-## Reporting assumptions
+## Reporting Assumptions
 
 Any result must include language similar to:
 
 ```text
-Under the selected assumptions and random seed...
+Under the selected assumptions...
+```
+
+If stochastic choices remain, use:
+
+```text
+Under the selected assumptions and this run...
 ```
 
 Do not report outputs as unconditional facts.
 
-## Assumptions to revisit later
+## Assumptions To Revisit Later
 
 Later versions should revisit:
 
-- mutation spectrum
+- alternatives to the Poisson mutation multiplicity assumption
+- biological effects of category-probability normalization
+- survival randomness and reproducibility
+- boundary handling for the current linear fitness formula
+- separate genome-integrity outputs beyond harmful mutation counts
+- changing distributions of fitness effects
 - epistasis
-- changing distribution of fitness effects
-- explicit bottleneck and transfer protocols
 - clonal interference
-- drift calibration
+- genetic drift
+- explicit bottleneck and transfer protocols
+- nutrient and carrying-capacity dynamics
 - environmental change
-- robustness across many alternative environments
+- robustness across alternative environments
 - parameter fitting from empirical data
-- uncertainty propagation across repeated seeds
+- uncertainty propagation across repeated runs

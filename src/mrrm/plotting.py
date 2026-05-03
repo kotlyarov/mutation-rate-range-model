@@ -182,20 +182,20 @@ def make_lineage_population_figure(results: LineageSimulationResult) -> go.Figur
     fig = go.Figure()
     fig.add_scatter(
         x=history["generation"],
-        y=history["actual_population_size"],
+        y=history["total_population"],
         mode="lines",
         name="Total population",
         line={"width": 3},
     )
     fig.add_scatter(
         x=history["generation"],
-        y=history["beneficial_dominant_population_size"],
+        y=history["beneficial_lineage_population"],
         mode="lines",
         name="Benefit-led population",
     )
     fig.add_scatter(
         x=history["generation"],
-        y=history["harmful_dominant_population_size"],
+        y=history["harmful_lineage_population"],
         mode="lines",
         name="Decay-led population",
     )

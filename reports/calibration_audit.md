@@ -1,7 +1,8 @@
 # Calibration Audit Report
 
-This report audits the current deterministic calibration path. It is a diagnostic
-report, not a validation claim. The fitted benefit curve is non-negative, so
+This report audits the pre-rewrite deterministic calibration path. It is a
+historical diagnostic report, not a validation claim for the current lineage
+mutation-selection model. The fitted benefit curve is non-negative, so
 negative relative-fitness observations are preserved in residual tables but are
 not used as benefit-fit rows.
 
@@ -199,8 +200,9 @@ negative relative-fitness observations because they are real observations.
   parameters and different threshold estimates, so current thresholds are
   calibration-sensitive.
 - The all-strain fit collapses to a nearly flat predicted benefit around
-  `1.12` for most rows, which is a warning sign that the current deterministic
-  benefit curve is underidentified by final-generation fitness data alone.
+  `1.12` for most rows, which is a warning sign that the pre-rewrite
+  deterministic benefit curve is underidentified by final-generation fitness
+  data alone.
 - Leave-one-strain-out errors are non-trivial, especially for `MRXL`, so the
   current fitted parameters should be treated as exploratory diagnostics rather
   than validated biological estimates.

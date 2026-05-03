@@ -1,58 +1,74 @@
 # Scientific Background
 
-This document explains the biological motivation for the Mutation Rate Range Model.
+This document explains the biological motivation for the Mutation Rate Range
+Model.
 
 ## Problem
 
 Mutation is necessary for adaptation, but mutation is also costly.
 
-A very low mutation rate can slow adaptation because beneficial variants appear too rarely. A very high mutation rate can increase deleterious load, genome degradation, and loss of robustness. The interesting question is not whether mutation is good or bad. The interesting question is whether there is a mutation-rate range where adaptation remains strong while long-term genomic damage is not yet dominant.
+A very low mutation rate can slow adaptation because beneficial variants appear
+too rarely. A very high mutation rate can increase deleterious load, lethal
+events, genome degradation, and loss of robustness. The interesting question is
+not whether mutation is good or bad. The interesting question is whether there
+are assumption-dependent regimes where adaptation can occur before mutation
+burden dominates.
 
-## Why use an *E. coli*-like asexual population?
+## Why Use An *E. coli*-Like Asexual Population?
 
-The first version focuses on an *E. coli*-like asexual population because:
+The first reviewed model focuses on an *E. coli*-like asexual population
+because:
 
 - *E. coli* is experimentally well studied.
 - LTEE data provides unusually long evolutionary time series.
 - Asexual populations avoid complications from recombination.
 - Mutator strains allow comparison between different mutation-rate regimes.
-- Existing literature already discusses trade-offs between adaptation and mutation burden.
+- Existing literature discusses trade-offs between adaptation and mutation
+  burden.
 
 This is not a claim that the model applies directly to all organisms.
 
-## Key idea
+## Key Idea
 
 Selected-environment fitness and genome integrity are not the same thing.
 
-A lineage may continue improving in the selected environment while losing functions that are weakly selected, conditionally useful, or irrelevant in the current environment. This is one reason the model separates selected-environment adaptive benefit from genome-decay or robustness-loss proxies.
+A lineage may continue improving in the selected environment while losing
+functions that are weakly selected, conditionally useful, or irrelevant in the
+current environment. The current lineage model keeps selected-environment adaptation
+visible through beneficial mutation counts and fitness score, while harmful and
+lethal mutation counts act as simplified burden proxies.
 
-## Relevant empirical themes
+This separation is still incomplete. A future model may need explicit
+genome-integrity or robustness outputs beyond mutation counts.
 
-### Sustained adaptation with genome decay
+## Relevant Empirical Themes
 
-Hypermutable LTEE lineages can show sustained fitness gains in the selected laboratory environment while also accumulating signatures of genome decay.
+### Sustained Adaptation With Genome Decay
 
-This motivates separate model outputs:
+Hypermutable LTEE lineages can show sustained fitness gains in the selected
+laboratory environment while also accumulating signatures of genome decay.
 
-```text
-selected-environment fitness gain
-genome-decay proxy
-retained robustness
-```
+This motivates reporting selected-environment fitness separately from harmful,
+lethal, and neutral mutation accumulation.
 
-### High mutation rates can limit adaptation
+### High Mutation Rates Can Limit Adaptation
 
-Experimental work with engineered *E. coli* mutation rates suggests that increasing mutation rate is not always beneficial. At high enough rates, the cost of deleterious mutations can limit adaptive evolution.
+Experimental work with engineered *E. coli* mutation rates suggests that
+increasing mutation rate is not always beneficial. At high enough rates, the
+cost of deleterious and lethal mutations can limit adaptive evolution.
 
-This motivates a net-score curve that can peak and then decline.
+This motivates explicit mutation supply, harmful mutation probability, lethal
+mutation probability, and minimum-fitness filtering.
 
-### Mutation-rate evolution is context-dependent
+### Mutation-Rate Evolution Is Context-Dependent
 
-Theoretical work on rapidly adapting asexual populations shows that mutation-rate evolution depends on population size, beneficial-mutation supply, deleterious load, linkage, and adaptation dynamics.
+Theoretical work on rapidly adapting asexual populations shows that
+mutation-rate evolution depends on population size, beneficial-mutation supply,
+deleterious load, linkage, and adaptation dynamics.
 
 This motivates reporting all results as conditional on assumptions.
 
-## Model implication
+## Model Implication
 
 The model should not answer:
 
@@ -63,24 +79,31 @@ What is the exact optimal mutation rate?
 It should answer:
 
 ```text
-Under these assumptions, what mutation-rate range produces plausible benefit, cost, and robustness trade-offs?
+Under these assumptions, what lineage trajectories occur for this mutation
+rate or mutation-rate sweep?
 ```
 
-## Why curve-based modelling first?
+## Why A Lineage Mutation-Selection Model?
 
-A full model would require:
+The lineage rewrite moves away from using deterministic curves as the primary
+model behavior because the previous formulas were too far from the intended
+biological process.
 
-- distributions of fitness effects
-- changing environments
-- epistasis
-- clonal interference
-- genetic drift
-- population bottlenecks
-- lineage-specific mutator dynamics
-- uncertainty in empirical measurements
+A lineage mutation-selection model makes the following assumptions explicit:
 
-The first model deliberately avoids this complexity. It starts with transparent deterministic curves so that assumptions are visible and easy to challenge.
+- mutation-bearing descendants are produced generation by generation
+- descendants inherit previous mutation counts
+- beneficial, harmful, lethal, and neutral mutations are tracked separately
+- lethal and low-fitness lineages are removed
+- population pressure is applied when population exceeds a cap
+- weighted mean fitness is calculated from surviving lineages
 
-## Scientific caution
+This is still a simplified model. It is easier to inspect than a full
+population-genetic simulator, but it remains far from real bacterial evolution.
 
-The first model is exploratory. It is intended to test whether assumptions produce biologically plausible curve shapes, not to estimate a true biological optimum.
+## Scientific Caution
+
+The current lineage model is exploratory and uncalibrated.
+
+It is intended to test whether assumptions produce biologically plausible
+lineage trajectories, not to estimate a true biological optimum.

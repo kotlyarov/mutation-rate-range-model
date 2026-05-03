@@ -2,8 +2,9 @@ import numpy as np
 import pytest
 
 from mrrm import (
+    ComputationLimitError,
     LineageParameters,
-    mutation_transition_probabilities,
+    mutation_category_probabilities,
     simulate_lineage_survival,
 )
 from mrrm.plotting import make_lineage_population_figure
@@ -12,12 +13,14 @@ from mrrm.validation import ParameterValidationError
 
 def test_lineage_history_has_generation_axis_and_finite_metrics():
     params = LineageParameters(
-        generations=12,
-        effective_population_size=5_000,
-        mutation_rate_multiplier=8.0,
-        beneficial_mutation_rate=1.0 / 1_000.0,
-        neutral_mutation_rate=1.0 / 1_000.0,
-        deleterious_mutation_rate=1.0 / 1_000.0,
+        seed_population=300,
+        population_cap=1_000,
+        generations=8,
+        mutation_rate=0.05,
+        beneficial_mutation_rate=0.2,
+        harmful_mutation_rate=0.1,
+        lethal_mutation_rate=0.02,
+        randomness=0.0,
         random_seed=17,
     )
     results = simulate_lineage_survival(params)
@@ -26,138 +29,125 @@ def test_lineage_history_has_generation_axis_and_finite_metrics():
     assert history["generation"].shape == (params.generations + 1,)
     assert history["generation"][0] == 0
     assert history["generation"][-1] == params.generations
-    assert history["total_lineages_evolved"][0] == 0
-    assert history["total_lineages_survived"][0] == 0
-    new_mutation_lineages = (
-        history["neutral_mutation_offspring"]
-        + history["harmful_mutation_offspring"]
-        + history["beneficial_mutation_offspring"]
-        + history["mixed_mutation_offspring"]
-    )
-    assert np.array_equal(
-        np.diff(history["total_lineages_evolved"]),
-        new_mutation_lineages[1:],
-    )
+    assert history["lineage_counter_cumulative"][0] == 1
+    assert np.all(np.diff(history["lineage_counter_cumulative"]) >= 0)
     for values in history.values():
         assert values.shape == (params.generations + 1,)
         assert np.all(np.isfinite(values.astype(float)))
-    assert np.all(history["carrying_capacity"] == params.effective_population_size)
-    assert np.all(history["actual_population_size"] <= params.effective_population_size)
-    assert np.all(history["total_lineages_survived"] <= history["actual_population_size"])
-    assert np.all(history["total_lineages_survived"] <= history["total_lineages_evolved"])
-    assert np.all(history["actual_population_size"] <= history["viable_population_size"])
-    assert np.all(history["viable_population_size"] <= history["candidate_population_size"])
-    assert np.all(history["beneficial_dominant_population_size"] >= 0)
-    assert np.all(history["harmful_dominant_population_size"] >= 0)
-    assert np.all(
-        history["beneficial_dominant_population_size"]
-        + history["harmful_dominant_population_size"]
-        <= history["actual_population_size"]
-    )
+    assert np.all(history["total_population"] >= 0)
+    assert np.all(history["lineage_count_current"] <= history["lineage_counter_cumulative"])
+    assert np.all(history["neutral_mutation_count_total"] >= 0)
 
 
-def test_transition_probabilities_are_valid_and_sum_to_one():
-    params = LineageParameters(mutation_rate_multiplier=25.0)
-    probabilities = mutation_transition_probabilities(params).as_array()
-
-    assert probabilities.shape == (5,)
-    assert np.all(probabilities >= 0)
-    assert np.all(probabilities <= 1)
-    assert np.isclose(np.sum(probabilities), 1.0)
-
-
-def test_no_mutation_offspring_do_not_count_as_new_lineages():
+def test_category_probabilities_are_valid_and_compound_normalized():
     params = LineageParameters(
-        generations=5,
-        effective_population_size=100,
-        mutation_rate_multiplier=1.0,
-        beneficial_mutation_rate=0.0,
-        neutral_mutation_rate=0.0,
-        deleterious_mutation_rate=0.0,
+        beneficial_mutation_rate=0.1,
+        harmful_mutation_rate=0.2,
+        lethal_mutation_rate=0.05,
+        compound_effect=0.5,
+    )
+    seed_probabilities = mutation_category_probabilities(params, total_mutations=0)
+    loaded_probabilities = mutation_category_probabilities(params, total_mutations=10)
+
+    assert seed_probabilities.as_array().shape == (4,)
+    assert np.all(seed_probabilities.as_array() >= 0)
+    assert np.isclose(np.sum(seed_probabilities.as_array()), 1.0)
+    assert np.isclose(np.sum(loaded_probabilities.as_array()), 1.0)
+    assert loaded_probabilities.neutral < seed_probabilities.neutral
+    assert loaded_probabilities.harmful > seed_probabilities.harmful
+
+
+def test_no_mutation_rate_keeps_seed_lineage_and_grows_population():
+    params = LineageParameters(
+        seed_population=20,
+        population_cap=1_000,
+        generations=3,
+        mutation_rate=0.0,
+        randomness=0.0,
         random_seed=14,
     )
     results = simulate_lineage_survival(params)
 
-    assert all(
-        record.no_mutation_offspring == params.effective_population_size
-        for record in results.history[1:]
-    )
-    assert all(record.total_lineages_evolved == 0 for record in results.history)
-    assert all(record.total_lineages_survived == 0 for record in results.history)
-    assert results.outcome.final_total_lineages_evolved == 0
-    assert results.outcome.final_total_lineages_survived == 0
+    assert [record.total_population for record in results.history] == [20, 40, 80, 160]
+    assert all(record.mutation_lineages_created == 0 for record in results.history)
+    assert all(record.lineage_counter_cumulative == 1 for record in results.history)
+    assert len(results.final_lineages) == 1
+    assert results.final_lineages[0].lineage_id == 1
 
 
-def test_neutral_mutation_lineages_count_as_surviving_evolved_lineages():
+def test_poisson_mutation_event_can_create_multi_mutation_lineages():
     params = LineageParameters(
+        seed_population=250,
+        population_cap=10_000,
         generations=1,
-        effective_population_size=100,
-        mutation_rate_multiplier=1.0,
+        mutation_rate=1.5,
         beneficial_mutation_rate=0.0,
-        neutral_mutation_rate=1e9,
-        deleterious_mutation_rate=0.0,
-        random_seed=19,
+        harmful_mutation_rate=0.0,
+        lethal_mutation_rate=0.0,
+        randomness=0.0,
+        random_seed=3,
     )
     results = simulate_lineage_survival(params)
     record = results.history[-1]
 
-    assert record.neutral_mutation_offspring == params.effective_population_size
-    assert record.total_lineages_evolved == params.effective_population_size
-    assert record.total_lineages_survived == params.effective_population_size
-    assert (
-        results.outcome.final_total_lineages_survived
-        == params.effective_population_size
-    )
+    assert record.mutation_lineages_created > 0
+    assert record.one_mutation_lineages_created > 0
+    assert record.multi_mutation_lineages_created > 0
+    assert record.lineage_counter_cumulative == 1 + record.mutation_lineages_created
+    assert any(lineage.total_mutations > 1 for lineage in results.final_lineages)
 
 
-def test_accumulated_state_carries_forward_across_generations():
+def test_lethal_mutation_lineages_are_removed_at_selection():
     params = LineageParameters(
-        generations=4,
-        effective_population_size=2_000,
-        mutation_rate_multiplier=1.0,
-        beneficial_mutation_rate=2.0,
-        deleterious_mutation_rate=0.0,
-        neutral_mutation_rate=0.0,
-        beneficial_effect_size=0.1,
-        selection_strength=0.0,
-        random_seed=4,
+        seed_population=200,
+        population_cap=1_000,
+        generations=1,
+        mutation_rate=1.0,
+        beneficial_mutation_rate=0.0,
+        harmful_mutation_rate=0.0,
+        lethal_mutation_rate=1.0,
+        randomness=0.0,
+        random_seed=8,
     )
     results = simulate_lineage_survival(params)
-    mean_benefit = np.asarray(
-        [record.mean_benefit for record in results.history],
-        dtype=float,
-    )
+    record = results.history[-1]
 
-    assert mean_benefit[0] == 0.0
-    assert mean_benefit[-1] > mean_benefit[1] > 0.0
-    assert results.history[-1].beneficial_adoption_fraction == 1.0
+    assert record.lethal_lineages_removed > 0
+    assert all(lineage.lethal_mutations == 0 for lineage in results.final_lineages)
+    assert record.lethal_mutation_count_total == 0
 
 
-def test_tiny_population_does_not_create_fractional_impossible_lineages():
+def test_low_fitness_lineages_are_removed():
     params = LineageParameters(
-        generations=10,
-        effective_population_size=1,
-        mutation_rate_multiplier=1.0,
-        beneficial_mutation_rate=1e-9,
-        deleterious_mutation_rate=0.0,
-        neutral_mutation_rate=0.0,
-        random_seed=1,
+        seed_fitness=0.6,
+        seed_population=200,
+        population_cap=1_000,
+        generations=1,
+        mutation_rate=1.0,
+        beneficial_mutation_rate=0.0,
+        harmful_mutation_rate=1.0,
+        lethal_mutation_rate=0.0,
+        mutation_effect=0.4,
+        minimum_fitness=0.4,
+        randomness=0.0,
+        random_seed=9,
     )
     results = simulate_lineage_survival(params)
+    record = results.history[-1]
 
-    assert all(record.beneficial_mutation_offspring == 0 for record in results.history)
-    assert results.outcome.beneficial_survived is False
-    assert results.outcome.final_beneficial_adoption_fraction == 0.0
+    assert record.low_fitness_lineages_removed > 0
+    assert all(lineage.fitness_score >= params.minimum_fitness for lineage in results.final_lineages)
 
 
 def test_seeded_stochastic_runs_are_reproducible():
     params = LineageParameters(
-        generations=8,
-        effective_population_size=2_500,
-        mutation_rate_multiplier=12.0,
-        beneficial_mutation_rate=1.0 / 500.0,
-        neutral_mutation_rate=1.0 / 500.0,
-        deleterious_mutation_rate=1.0 / 500.0,
+        seed_population=300,
+        population_cap=700,
+        generations=5,
+        mutation_rate=0.1,
+        beneficial_mutation_rate=0.2,
+        harmful_mutation_rate=0.1,
+        lethal_mutation_rate=0.01,
         random_seed=123,
     )
     first = simulate_lineage_survival(params)
@@ -167,105 +157,40 @@ def test_seeded_stochastic_runs_are_reproducible():
         first.history_arrays()["mean_fitness"],
         second.history_arrays()["mean_fitness"],
     )
+    assert first.final_lineages == second.final_lineages
     assert first.outcome == second.outcome
 
 
-def test_generation_records_split_offspring_into_mutation_classes():
+def test_population_cap_uses_rounded_fitness_weighted_selection():
     params = LineageParameters(
-        generations=1,
-        effective_population_size=10_000,
-        mutation_rate_multiplier=1.0,
-        beneficial_mutation_rate=1.0,
-        deleterious_mutation_rate=1.0,
-        neutral_mutation_rate=1.0,
-        random_seed=3,
+        seed_population=100,
+        population_cap=80,
+        generations=3,
+        mutation_rate=0.3,
+        beneficial_mutation_rate=0.8,
+        harmful_mutation_rate=0.0,
+        lethal_mutation_rate=0.0,
+        mutation_effect=0.1,
+        randomness=0.0,
+        random_seed=4,
     )
     results = simulate_lineage_survival(params)
-    record = results.history[-1]
 
-    assert record.no_mutation_offspring > 0
-    assert record.neutral_mutation_offspring > 0
-    assert record.harmful_mutation_offspring > 0
-    assert record.beneficial_mutation_offspring > 0
-    assert record.mixed_mutation_offspring > 0
-    assert record.mixed_fraction > 0
-
-
-def test_population_capacity_is_not_refilled_after_viability_filtering():
-    params = LineageParameters(
-        generations=1,
-        effective_population_size=10_000,
-        mutation_rate_multiplier=1.0,
-        beneficial_mutation_rate=1e9,
-        neutral_mutation_rate=0.0,
-        deleterious_mutation_rate=0.02,
-        beneficial_effect_size=1.0,
-        benefit_saturation=10.0,
-        decay_effect_size=10.0,
-        decay_fitness_penalty=0.0,
-        robustness_fitness_weight=0.0,
-        lethal_decay_threshold=5.0,
-        selection_strength=3.0,
-        random_seed=8,
-    )
-    results = simulate_lineage_survival(params)
-    record = results.history[-1]
-
-    assert record.carrying_capacity == params.effective_population_size
-    assert record.candidate_population_size == params.effective_population_size
-    assert 0 < record.viable_population_size < params.effective_population_size
-    assert record.beneficial_mutation_offspring == record.viable_population_size
-    assert record.mixed_mutation_offspring > 0
-    assert record.actual_population_size == record.viable_population_size
-
-
-def test_trajectory_classification_counts_benefit_and_decay_led_populations():
-    beneficial_results = simulate_lineage_survival(
-        LineageParameters(
-            generations=1,
-            effective_population_size=1_000,
-            mutation_rate_multiplier=1.0,
-            beneficial_mutation_rate=1e9,
-            neutral_mutation_rate=0.0,
-            deleterious_mutation_rate=0.0,
-            beneficial_effect_size=0.2,
-            random_seed=15,
-        )
-    )
-    beneficial_record = beneficial_results.history[-1]
-
-    assert beneficial_record.beneficial_dominant_population_size == 1_000
-    assert beneficial_record.harmful_dominant_population_size == 0
-
-    harmful_results = simulate_lineage_survival(
-        LineageParameters(
-            generations=1,
-            effective_population_size=1_000,
-            mutation_rate_multiplier=1.0,
-            beneficial_mutation_rate=0.0,
-            neutral_mutation_rate=0.0,
-            deleterious_mutation_rate=1e9,
-            decay_effect_size=1.0,
-            decay_fitness_penalty=0.2,
-            lethal_decay_threshold=100.0,
-            robustness_fitness_weight=0.0,
-            random_seed=16,
-        )
-    )
-    harmful_record = harmful_results.history[-1]
-
-    assert harmful_record.beneficial_dominant_population_size == 0
-    assert harmful_record.harmful_dominant_population_size == 1_000
+    assert any(record.pre_cap_population > params.population_cap for record in results.history)
+    assert all(record.total_population >= 0 for record in results.history)
+    assert results.history[-1].beneficial_lineage_population > 0
 
 
 def test_population_trajectory_figure_uses_population_counts_and_solid_lines():
     params = LineageParameters(
+        seed_population=200,
+        population_cap=500,
         generations=3,
-        effective_population_size=1_000,
-        mutation_rate_multiplier=1.0,
-        beneficial_mutation_rate=0.1,
-        neutral_mutation_rate=0.0,
-        deleterious_mutation_rate=0.1,
+        mutation_rate=0.1,
+        beneficial_mutation_rate=0.2,
+        harmful_mutation_rate=0.1,
+        lethal_mutation_rate=0.0,
+        randomness=0.0,
         random_seed=18,
     )
     results = simulate_lineage_survival(params)
@@ -281,187 +206,50 @@ def test_population_trajectory_figure_uses_population_counts_and_solid_lines():
     assert all(trace.mode == "lines" for trace in figure.data)
     assert all(trace.line.dash in (None, "solid") for trace in figure.data)
     assert list(figure.data[0].y) == [
-        record.actual_population_size for record in results.history
+        record.total_population for record in results.history
     ]
     assert list(figure.data[1].y) == [
-        record.beneficial_dominant_population_size for record in results.history
+        record.beneficial_lineage_population for record in results.history
     ]
     assert list(figure.data[2].y) == [
-        record.harmful_dominant_population_size for record in results.history
+        record.harmful_lineage_population for record in results.history
     ]
     assert figure.layout.yaxis.title.text == "Population size"
     assert figure.layout.yaxis2.title.text == "Mean fitness"
 
 
-def test_population_can_collapse_when_all_candidates_are_nonviable():
+def test_lineage_limit_returns_clear_error():
     params = LineageParameters(
-        generations=3,
-        effective_population_size=500,
-        mutation_rate_multiplier=1.0,
-        beneficial_mutation_rate=0.0,
-        neutral_mutation_rate=0.0,
-        deleterious_mutation_rate=1e9,
-        decay_effect_size=10.0,
-        decay_fitness_penalty=1.0,
-        robustness_fitness_weight=0.0,
-        random_seed=2,
-    )
-    results = simulate_lineage_survival(params)
-    first_generation = results.history[1]
-    final_generation = results.history[-1]
-
-    assert first_generation.viable_population_size == 0
-    assert first_generation.actual_population_size == 0
-    assert first_generation.total_lineages_evolved == params.effective_population_size
-    assert final_generation.actual_population_size == 0
-    assert final_generation.total_lineages_evolved == params.effective_population_size
-    assert final_generation.total_lineages_survived == 0
-    assert results.final_lineages == ()
-    assert results.outcome.collapsed is True
-    assert (
-        results.outcome.final_total_lineages_evolved
-        == params.effective_population_size
+        seed_population=50,
+        population_cap=100,
+        generations=1,
+        mutation_rate=5.0,
+        max_lineage_classes=5,
+        random_seed=1,
     )
 
-
-def test_lethal_decay_threshold_overrides_high_benefit():
-    params = LineageParameters(
-        generations=2,
-        effective_population_size=500,
-        mutation_rate_multiplier=1.0,
-        beneficial_mutation_rate=1e9,
-        neutral_mutation_rate=0.0,
-        deleterious_mutation_rate=1e9,
-        beneficial_effect_size=100.0,
-        benefit_saturation=1_000.0,
-        decay_effect_size=10.0,
-        decay_fitness_penalty=0.0,
-        robustness_fitness_weight=0.0,
-        lethal_decay_threshold=5.0,
-        random_seed=11,
-    )
-    results = simulate_lineage_survival(params)
-    first_generation = results.history[1]
-
-    assert first_generation.mixed_mutation_offspring == params.effective_population_size
-    assert first_generation.viable_population_size == 0
-    assert first_generation.actual_population_size == 0
-    assert results.outcome.collapsed is True
-
-
-def test_minimum_robustness_threshold_overrides_high_benefit():
-    params = LineageParameters(
-        generations=2,
-        effective_population_size=500,
-        mutation_rate_multiplier=1.0,
-        beneficial_mutation_rate=1e9,
-        neutral_mutation_rate=0.0,
-        deleterious_mutation_rate=1e9,
-        beneficial_effect_size=100.0,
-        benefit_saturation=1_000.0,
-        decay_effect_size=2.0,
-        decay_fitness_penalty=0.0,
-        robustness_decay_rate=1.0,
-        robustness_fitness_weight=0.0,
-        lethal_decay_threshold=100.0,
-        minimum_viable_robustness=0.5,
-        random_seed=12,
-    )
-    results = simulate_lineage_survival(params)
-    first_generation = results.history[1]
-
-    assert first_generation.mixed_mutation_offspring == params.effective_population_size
-    assert first_generation.viable_population_size == 0
-    assert first_generation.actual_population_size == 0
-    assert results.outcome.collapsed is True
-
-
-def test_already_beneficial_lineages_continue_facing_mutation_exposure():
-    params = LineageParameters(
-        generations=2,
-        effective_population_size=20_000,
-        mutation_rate_multiplier=1.0,
-        beneficial_mutation_rate=2.0,
-        neutral_mutation_rate=0.0,
-        deleterious_mutation_rate=0.5,
-        beneficial_effect_size=0.5,
-        decay_effect_size=0.1,
-        decay_fitness_penalty=0.0,
-        robustness_fitness_weight=0.0,
-        benefit_saturation=10.0,
-        lethal_decay_threshold=100.0,
-        random_seed=23,
-    )
-    results = simulate_lineage_survival(params)
-    second_generation = results.history[2]
-
-    assert results.history[1].beneficial_adoption_fraction > 0
-    assert second_generation.beneficial_parent_population_size > 0
-    assert (
-        second_generation.beneficial_parent_harmful_mutation_offspring
-        + second_generation.beneficial_parent_mixed_mutation_offspring
-    ) > 0
-    assert (
-        second_generation.beneficial_parent_no_mutation_offspring
-        + second_generation.beneficial_parent_neutral_mutation_offspring
-    ) > 0
-
-
-def test_beneficial_effect_size_changes_competitive_success():
-    base_params = {
-        "generations": 10,
-        "effective_population_size": 10_000,
-        "mutation_rate_multiplier": 1.0,
-        "beneficial_mutation_rate": 0.02,
-        "neutral_mutation_rate": 0.0,
-        "deleterious_mutation_rate": 0.005,
-        "decay_effect_size": 0.2,
-        "decay_fitness_penalty": 0.2,
-        "robustness_fitness_weight": 0.0,
-        "benefit_saturation": 10.0,
-        "selection_strength": 2.0,
-        "random_seed": 42,
-    }
-    low_effect = simulate_lineage_survival(
-        LineageParameters(**base_params, beneficial_effect_size=1e-6)
-    )
-    high_effect = simulate_lineage_survival(
-        LineageParameters(**base_params, beneficial_effect_size=1.0)
-    )
-
-    assert (
-        high_effect.outcome.final_beneficial_adoption_fraction
-        > low_effect.outcome.final_beneficial_adoption_fraction + 0.5
-    )
-    assert (
-        high_effect.outcome.final_mean_fitness
-        > low_effect.outcome.final_mean_fitness + 1.0
-    )
-    assert (
-        high_effect.outcome.final_actual_population_size
-        <= high_effect.outcome.final_viable_population_size
-    )
-    assert (
-        low_effect.outcome.final_actual_population_size
-        <= low_effect.outcome.final_viable_population_size
-    )
+    with pytest.raises(ComputationLimitError, match="max_lineage_classes"):
+        simulate_lineage_survival(params)
 
 
 def test_invalid_lineage_parameters_raise_clear_errors():
-    with pytest.raises(ParameterValidationError, match="mutation_rate_multiplier"):
-        LineageParameters(mutation_rate_multiplier=0.0)
+    with pytest.raises(ParameterValidationError, match="seed_fitness"):
+        LineageParameters(seed_fitness=1.5)
 
-    with pytest.raises(ParameterValidationError, match="effective_population_size"):
-        LineageParameters(effective_population_size=0)
+    with pytest.raises(ParameterValidationError, match="seed_population"):
+        LineageParameters(seed_population=0)
+
+    with pytest.raises(ParameterValidationError, match="population_cap"):
+        LineageParameters(population_cap=0)
 
     with pytest.raises(ParameterValidationError, match="generations"):
-        LineageParameters(generations=0)
+        LineageParameters(generations=-1)
 
-    with pytest.raises(ParameterValidationError, match="viability_fitness_threshold"):
-        LineageParameters(viability_fitness_threshold=-0.1)
+    with pytest.raises(ParameterValidationError, match="beneficial_mutation_rate"):
+        LineageParameters(beneficial_mutation_rate=1.1)
 
-    with pytest.raises(ParameterValidationError, match="lethal_decay_threshold"):
-        LineageParameters(lethal_decay_threshold=-1.0)
+    with pytest.raises(ParameterValidationError, match="minimum_fitness"):
+        LineageParameters(minimum_fitness=1.1)
 
-    with pytest.raises(ParameterValidationError, match="minimum_viable_robustness"):
-        LineageParameters(minimum_viable_robustness=1.1)
+    with pytest.raises(ParameterValidationError, match="max_runtime_seconds"):
+        LineageParameters(max_runtime_seconds=0.0)

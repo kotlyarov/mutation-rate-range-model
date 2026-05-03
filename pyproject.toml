@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mutation-rate-range-model"
 version = "0.1.0"
-description = "Deterministic exploratory curves for mutation-rate trade-offs."
+description = "Exploratory lineage model for mutation-rate trade-offs."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

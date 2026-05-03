@@ -58,41 +58,32 @@ class ModelParameters:
 
 @dataclass(frozen=True)
 class LineageParameters:
-    """Inputs for one generational lineage-survival run.
+    """Inputs for one explicit lineage mutation-selection run.
 
-    A single run fixes the mutation-rate multiplier and follows surviving
-    lineage classes across generations. Defaults are exploratory assumptions,
-    not fitted biological constants.
+    Defaults are exploratory assumptions, not fitted biological constants.
     """
 
-    mutation_rate_multiplier: float = 1.0
-    effective_population_size: int = 1_000_000
+    seed_fitness: float = 0.6
+    seed_population: int = 100_000
+    population_cap: int = 1_000_000
     generations: int = 1_000
 
-    beneficial_mutation_rate: float = 1.0 / 50_000.0
-    neutral_mutation_rate: float = 1.0 / 50_000.0
-    deleterious_mutation_rate: float = 1.0 / 50_000.0
+    mutation_rate: float = 0.002
+    beneficial_mutation_rate: float = 0.001
+    harmful_mutation_rate: float = 0.1
+    lethal_mutation_rate: float = 0.01
+    compound_effect: float = 0.1
 
-    beneficial_effect_size: float = 0.02
-    decay_effect_size: float = 1.0
+    mutation_effect: float = 0.01
+    minimum_fitness: float = 0.4
+    randomness: float = 0.1
 
-    benefit_saturation: float = 1.0
-    interference_strength: float = 0.01
-    interference_exponent: float = 1.0
-
-    robustness_decay_rate: float = 0.05
-    decay_fitness_penalty: float = 0.2
-    robustness_fitness_weight: float = 0.1
-    lethal_decay_threshold: float = 50.0
-    minimum_viable_robustness: float = 1e-6
-
-    selection_strength: float = 1.0
-    viability_fitness_threshold: float = 1e-9
     beneficial_adoption_threshold: float = 0.50
     collapse_fitness_threshold: float = 0.50
 
     random_seed: int | None = 1
-    max_lineage_classes: int = 5_000
+    max_runtime_seconds: float = 60.0
+    max_lineage_classes: int = 100_000
 
     def __post_init__(self) -> None:
         from .validation import validate_lineage_parameters

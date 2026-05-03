@@ -29,11 +29,14 @@ from .curves import (
     survival_selection,
 )
 from .lineage import (
+    ComputationLimitError,
     GenerationRecord,
     LineageClass,
     LineageOutcomeSummary,
     LineageSimulationResult,
+    MutationCategoryProbabilities,
     MutationTransitionProbabilities,
+    mutation_category_probabilities,
     mutation_transition_probabilities,
     simulate_lineage_survival,
 )
@@ -43,6 +46,7 @@ __all__ = [
     "CalibrationAudit",
     "CalibrationAuditFit",
     "CalibrationResult",
+    "ComputationLimitError",
     "GenerationRecord",
     "LineageClass",
     "LineageOutcomeSummary",
@@ -50,6 +54,7 @@ __all__ = [
     "LineageSimulationResult",
     "ModelParameters",
     "ModelResults",
+    "MutationCategoryProbabilities",
     "MutationTransitionProbabilities",
     "ParameterEstimate",
     "RangeEstimate",
@@ -65,6 +70,7 @@ __all__ = [
     "estimate_range",
     "evaluate_model",
     "make_m_values",
+    "mutation_category_probabilities",
     "mutation_transition_probabilities",
     "net_score",
     "robustness",

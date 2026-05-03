@@ -2,9 +2,13 @@
 
 This report documents the first experimental-data scaffold for the Mutation Rate Range Model.
 
+Note: this report describes the data scaffold that predates the explicit
+lineage mutation-selection implementation. The current lineage model is
+documented separately in `docs/model_spec.md`.
+
 ## Status
 
-The current files are data curation scaffolds. `calibration_dataset_v0` now provides raw experimental inputs for calibration, but the deterministic model equations are unchanged and model outputs remain assumption-dependent.
+The current files are data curation scaffolds. `calibration_dataset_v0` now provides raw experimental inputs for calibration. Model outputs remain assumption-dependent, and calibration should be revisited for the current lineage model.
 
 calibration_dataset_v0 currently contains real Sprouffske et al. 2018 mutation-rate values and confidence intervals, plus curated Dryad growth-curve relative-fitness observations for the existing strain/replicate/final-generation calibration slots. Every fitness value names its same-batch ancestor control. The dataset still does not contain mutation-count/genome-decay costs or robustness observations, so decay and robustness conclusions remain unsupported.
 
@@ -70,7 +74,7 @@ Not included:
 
 No figure values were digitized. Fitness observations were curated from the original Dryad phenotyping archive. The raw Dryad final growth-curve generation is `2907`; rows are stored in the existing final-generation slot aligned with the paper's approximately `3000` generation label and the S3 mutation-rate rows.
 
-In calibrated mode, `calibration_dataset_v0` supplies empirical values for the evaluated mutation-rate range and selected relative-fitness response by strain and closest experimental generation. Negative relative-fitness observations remain visible as raw data. The current non-negative benefit curve is fit only to non-negative selected fitness observations; decay, robustness, and utility-weight parameters remain assumed or unsupported until exact cost or robustness observations are added.
+In calibrated mode for the pre-rewrite implementation, `calibration_dataset_v0` supplies empirical values for the evaluated mutation-rate range and selected relative-fitness response by strain and closest experimental generation. Negative relative-fitness observations remain visible as raw data. The pre-rewrite non-negative benefit curve is fit only to non-negative selected fitness observations; decay, robustness, and utility-weight parameters remain assumed or unsupported until exact cost or robustness observations are added.
 
 ## Validation Checks
 
