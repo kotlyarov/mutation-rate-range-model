@@ -55,7 +55,7 @@ def main() -> None:
         format_count_compact(outcome.final_population),
         f"cap {format_count_compact(outcome.population_cap)}",
     )
-    cols[1].metric("final mean fitness", f"{outcome.final_mean_fitness:.3g}")
+    cols[1].metric("final mean fitness (pre-cap)", f"{outcome.final_mean_fitness:.3g}")
     cols[2].metric("best lineage fitness", f"{outcome.final_best_fitness:.3g}")
     cols[3].metric(
         "current lineages",
@@ -293,6 +293,7 @@ def _render_model_audit(results) -> None:
                     "  size = size * 2 for remaining lineages",
                     "  remove lineages with fitness < minimum_fitness",
                     "  mean_fitness = sum(size * fitness) / sum(size)",
+                    "  mean_fitness is recorded before population-cap reduction",
                     "",
                     "Population cap when total population exceeds population_cap:",
                     "  adjusted_fitness = max(0, fitness + Normal(0, randomness))",
@@ -328,6 +329,8 @@ def _render_model_audit(results) -> None:
                 "population_cap": final_record.population_cap,
                 "total_population": final_record.total_population,
                 "pre_cap_population": final_record.pre_cap_population,
+                "mean_fitness": final_record.mean_fitness,
+                "post_cap_mean_fitness": final_record.post_cap_mean_fitness,
                 "lineage_count_current": final_record.lineage_count_current,
                 "lineage_counter_cumulative": (
                     final_record.lineage_counter_cumulative

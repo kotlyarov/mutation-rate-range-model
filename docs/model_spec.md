@@ -418,9 +418,13 @@ lineage B: fitness_score = 0.6, size = 1
 mean_fitness = (0.7 * 5 + 0.6 * 1) / 6 = 0.683333...
 ```
 
-The model should report mean fitness after low-fitness removal. If capacity
-selection changes lineage composition, the model should also report final
-post-cap mean fitness or clearly define `mean_fitness` as the pre-cap value.
+The model reports `mean_fitness` after low-fitness removal and before
+population-cap selection. This follows the numbered selection process above and
+keeps the reported mean from being inflated by cap-pressure reallocation.
+
+The model also reports `post_cap_mean_fitness` for audit and debugging. This is
+the population-weighted mean after population-cap selection changes lineage
+sizes.
 
 ### 6. Apply Population-Cap Selection
 
@@ -482,6 +486,7 @@ total_population
 lineage_count_current
 lineage_counter_cumulative
 mean_fitness
+post_cap_mean_fitness
 best_fitness
 dominant_lineage_fitness
 beneficial_mutation_count_total

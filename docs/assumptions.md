@@ -222,8 +222,10 @@ mean_fitness =
   sum(size * fitness_score) / sum(size)
 ```
 
-If cap selection changes lineage composition, the model should report whether
-mean fitness is measured before cap selection, after cap selection, or both.
+`mean_fitness` is measured after lethal and low-fitness lineages are removed,
+but before population-cap selection is applied. If cap selection changes lineage
+composition, `post_cap_mean_fitness` records the population-weighted mean after
+that cap step.
 
 ### Defaults Are Not Fitted Values
 

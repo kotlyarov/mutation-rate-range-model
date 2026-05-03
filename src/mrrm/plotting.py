@@ -203,7 +203,7 @@ def make_lineage_population_figure(results: LineageSimulationResult) -> go.Figur
         x=history["generation"],
         y=history["mean_fitness"],
         mode="lines",
-        name="Mean fitness",
+        name="Mean fitness (pre-cap)",
         yaxis="y2",
     )
     fig.update_layout(
@@ -211,7 +211,7 @@ def make_lineage_population_figure(results: LineageSimulationResult) -> go.Figur
         xaxis_title="Generation",
         yaxis={"title": "Population size", "rangemode": "tozero"},
         yaxis2={
-            "title": "Mean fitness",
+            "title": "Mean fitness (pre-cap)",
             "overlaying": "y",
             "side": "right",
             "rangemode": "tozero",

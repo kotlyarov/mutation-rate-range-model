@@ -76,6 +76,7 @@ class GenerationRecord:
     lineage_counter_cumulative: int
     mean_fitness: float
     pre_cap_mean_fitness: float
+    post_cap_mean_fitness: float
     best_fitness: float
     dominant_lineage_fitness: float
     beneficial_lineage_population: int
@@ -493,6 +494,7 @@ def _summarize_generation(
             lineage_counter_cumulative=int(lineage_counter),
             mean_fitness=0.0,
             pre_cap_mean_fitness=0.0,
+            post_cap_mean_fitness=0.0,
             best_fitness=0.0,
             dominant_lineage_fitness=0.0,
             beneficial_lineage_population=0,
@@ -536,6 +538,7 @@ def _summarize_generation(
     pre_cap_mean_fitness = float(stats.get("pre_cap_mean_fitness", 0.0))
     if generation == 0:
         pre_cap_mean_fitness = _weighted_mean_fitness(lineages)
+    post_cap_mean_fitness = float(np.average(fitness_values, weights=sizes))
     return GenerationRecord(
         generation=int(generation),
         population_cap=int(params.population_cap),
@@ -543,8 +546,9 @@ def _summarize_generation(
         pre_cap_population=pre_cap_population,
         lineage_count_current=len(lineages),
         lineage_counter_cumulative=int(lineage_counter),
-        mean_fitness=float(np.average(fitness_values, weights=sizes)),
+        mean_fitness=pre_cap_mean_fitness,
         pre_cap_mean_fitness=pre_cap_mean_fitness,
+        post_cap_mean_fitness=post_cap_mean_fitness,
         best_fitness=float(np.max(fitness_values)),
         dominant_lineage_fitness=float(dominant.fitness_score),
         beneficial_lineage_population=int(beneficial_population),

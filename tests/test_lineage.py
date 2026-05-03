@@ -181,6 +181,27 @@ def test_population_cap_uses_rounded_fitness_weighted_selection():
     assert results.history[-1].beneficial_lineage_population > 0
 
 
+def test_mean_fitness_is_recorded_before_population_cap_reallocation():
+    params = LineageParameters(
+        seed_population=100,
+        population_cap=80,
+        generations=1,
+        mutation_rate=0.3,
+        beneficial_mutation_rate=0.8,
+        harmful_mutation_rate=0.0,
+        lethal_mutation_rate=0.0,
+        mutation_effect=0.1,
+        randomness=0.0,
+        random_seed=4,
+    )
+    results = simulate_lineage_survival(params)
+    record = results.history[-1]
+
+    assert record.pre_cap_population > params.population_cap
+    assert record.mean_fitness == record.pre_cap_mean_fitness
+    assert record.post_cap_mean_fitness > record.mean_fitness
+
+
 def test_population_trajectory_figure_uses_population_counts_and_solid_lines():
     params = LineageParameters(
         seed_population=200,
@@ -200,7 +221,7 @@ def test_population_trajectory_figure_uses_population_counts_and_solid_lines():
         "Total population",
         "Benefit-led population",
         "Decay-led population",
-        "Mean fitness",
+        "Mean fitness (pre-cap)",
     ]
     assert [trace.yaxis for trace in figure.data] == [None, None, None, "y2"]
     assert all(trace.mode == "lines" for trace in figure.data)
@@ -215,7 +236,7 @@ def test_population_trajectory_figure_uses_population_counts_and_solid_lines():
         record.harmful_lineage_population for record in results.history
     ]
     assert figure.layout.yaxis.title.text == "Population size"
-    assert figure.layout.yaxis2.title.text == "Mean fitness"
+    assert figure.layout.yaxis2.title.text == "Mean fitness (pre-cap)"
 
 
 def test_lineage_limit_returns_clear_error():
