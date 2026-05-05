@@ -227,6 +227,12 @@ but before population-cap selection is applied. If cap selection changes lineage
 composition, `post_cap_mean_fitness` records the population-weighted mean after
 that cap step.
 
+### Original Lineage Population
+
+`original_lineage_population` means the current population of lineage id `1`,
+the exact unmutated seed lineage. Mutated descendants do not stay in lineage
+`1`; they receive new lineage ids at the Mutation event that created them.
+
 ### Defaults Are Not Fitted Values
 
 Default parameters are placeholders for model exploration.

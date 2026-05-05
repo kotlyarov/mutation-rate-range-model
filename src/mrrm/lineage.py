@@ -72,6 +72,7 @@ class GenerationRecord:
     population_cap: int
     total_population: int
     pre_cap_population: int
+    original_lineage_population: int
     lineage_count_current: int
     lineage_counter_cumulative: int
     mean_fitness: float
@@ -106,6 +107,7 @@ class LineageOutcomeSummary:
     final_generation: int
     population_cap: int
     final_population: int
+    final_original_lineage_population: int
     final_current_lineage_count: int
     final_cumulative_lineage_counter: int
     final_mean_fitness: float
@@ -490,6 +492,7 @@ def _summarize_generation(
             population_cap=int(params.population_cap),
             total_population=0,
             pre_cap_population=pre_cap_population,
+            original_lineage_population=0,
             lineage_count_current=0,
             lineage_counter_cumulative=int(lineage_counter),
             mean_fitness=0.0,
@@ -534,6 +537,9 @@ def _summarize_generation(
         if lineage.harmful_mutations > lineage.beneficial_mutations
     )
     neutral_population = total_population - beneficial_population - harmful_population
+    original_lineage_population = sum(
+        lineage.size for lineage in lineages if lineage.lineage_id == 1
+    )
 
     pre_cap_mean_fitness = float(stats.get("pre_cap_mean_fitness", 0.0))
     if generation == 0:
@@ -544,6 +550,7 @@ def _summarize_generation(
         population_cap=int(params.population_cap),
         total_population=total_population,
         pre_cap_population=pre_cap_population,
+        original_lineage_population=int(original_lineage_population),
         lineage_count_current=len(lineages),
         lineage_counter_cumulative=int(lineage_counter),
         mean_fitness=pre_cap_mean_fitness,
@@ -612,6 +619,7 @@ def _summarize_outcome(
         final_generation=final_record.generation,
         population_cap=final_record.population_cap,
         final_population=final_record.total_population,
+        final_original_lineage_population=final_record.original_lineage_population,
         final_current_lineage_count=final_record.lineage_count_current,
         final_cumulative_lineage_counter=final_record.lineage_counter_cumulative,
         final_mean_fitness=final_record.mean_fitness,

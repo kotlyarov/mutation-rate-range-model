@@ -71,8 +71,15 @@ def test_no_mutation_rate_keeps_seed_lineage_and_grows_population():
     assert [record.total_population for record in results.history] == [20, 40, 80, 160]
     assert all(record.mutation_lineages_created == 0 for record in results.history)
     assert all(record.lineage_counter_cumulative == 1 for record in results.history)
+    assert [record.original_lineage_population for record in results.history] == [
+        20,
+        40,
+        80,
+        160,
+    ]
     assert len(results.final_lineages) == 1
     assert results.final_lineages[0].lineage_id == 1
+    assert results.outcome.final_original_lineage_population == 160
 
 
 def test_poisson_mutation_event_can_create_multi_mutation_lineages():
@@ -219,24 +226,33 @@ def test_population_trajectory_figure_uses_population_counts_and_solid_lines():
 
     assert [trace.name for trace in figure.data] == [
         "Total population",
+        "Original lineage population",
         "Benefit-led population",
         "Decay-led population",
         "Mean fitness (pre-cap)",
     ]
-    assert [trace.yaxis for trace in figure.data] == [None, None, None, "y2"]
+    assert [trace.yaxis for trace in figure.data] == [None, None, None, None, "y2"]
     assert all(trace.mode == "lines" for trace in figure.data)
     assert all(trace.line.dash in (None, "solid") for trace in figure.data)
+    assert figure.data[2].line.color == "#2e7d32"
+    assert figure.data[3].line.color == "#c62828"
     assert list(figure.data[0].y) == [
         record.total_population for record in results.history
     ]
     assert list(figure.data[1].y) == [
-        record.beneficial_lineage_population for record in results.history
+        record.original_lineage_population for record in results.history
     ]
     assert list(figure.data[2].y) == [
+        record.beneficial_lineage_population for record in results.history
+    ]
+    assert list(figure.data[3].y) == [
         record.harmful_lineage_population for record in results.history
     ]
     assert figure.layout.yaxis.title.text == "Population size"
     assert figure.layout.yaxis2.title.text == "Mean fitness (pre-cap)"
+    assert tuple(figure.layout.yaxis2.range) == (0, 1)
+    assert figure.layout.legend.x > 1.0
+    assert figure.layout.margin.r >= 200
 
 
 def test_lineage_limit_returns_clear_error():

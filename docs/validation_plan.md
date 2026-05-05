@@ -54,6 +54,7 @@ For valid parameter values:
 - `neutral_mutations` is never negative
 - cumulative lineage counter never decreases
 - current lineage count never exceeds cumulative lineage counter
+- original lineage population is non-negative and never exceeds total population
 - weighted mean fitness matches lineage sizes and fitness scores
 - post-cap closest-integer rounding produces integer lineage sizes
 - seeded stochastic runs are reproducible

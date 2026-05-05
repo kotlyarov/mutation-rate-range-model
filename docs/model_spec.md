@@ -483,6 +483,7 @@ Each generation should record:
 ```text
 generation
 total_population
+original_lineage_population
 lineage_count_current
 lineage_counter_cumulative
 mean_fitness
@@ -500,6 +501,7 @@ The final output should include:
 
 ```text
 final_population
+final_original_lineage_population
 final_current_lineage_count
 final_cumulative_lineage_counter
 final_mean_fitness

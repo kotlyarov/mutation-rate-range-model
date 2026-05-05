@@ -12,7 +12,11 @@ if str(SRC) not in sys.path:
 
 import streamlit as st
 
-from mrrm import LineageParameters, simulate_lineage_survival
+from mrrm import (
+    LineageParameters,
+    LineageSimulationResult,
+    simulate_lineage_survival,
+)
 from mrrm.formatting import format_count_compact
 from mrrm.plotting import make_lineage_population_figure
 from mrrm.validation import ParameterValidationError
@@ -67,7 +71,8 @@ def main() -> None:
     )
 
     st.caption(
-        "Population counts use the left axis. Mean fitness uses the right axis."
+        "Population counts use the left axis. Mean fitness uses the right "
+        "axis fixed from 0 to 1."
     )
     st.plotly_chart(make_lineage_population_figure(results), use_container_width=True)
 
@@ -87,6 +92,9 @@ def main() -> None:
             ),
             "final_harmful_led_population": (
                 results.history[-1].harmful_lineage_population
+            ),
+            "final_original_lineage_population": (
+                outcome.final_original_lineage_population
             ),
             "beneficial_survived": outcome.beneficial_survived,
             "beneficial_reached_adoption_threshold": outcome.beneficial_adopted,
@@ -108,9 +116,15 @@ def main() -> None:
         )
 
     with st.expander("Final surviving lineages", expanded=False):
+        st.caption(
+            "Lineage 1 is the exact unmutated seed lineage. Mutated descendants "
+            "receive new lineage ids, so lineage 1 may have a small current "
+            "population after cap selection."
+        )
         st.dataframe(
-            [lineage.__dict__ for lineage in results.final_lineages],
+            _final_lineage_rows(results),
             use_container_width=True,
+            hide_index=True,
         )
 
     _render_model_audit(results)
@@ -329,6 +343,9 @@ def _render_model_audit(results) -> None:
                 "population_cap": final_record.population_cap,
                 "total_population": final_record.total_population,
                 "pre_cap_population": final_record.pre_cap_population,
+                "original_lineage_population": (
+                    final_record.original_lineage_population
+                ),
                 "mean_fitness": final_record.mean_fitness,
                 "post_cap_mean_fitness": final_record.post_cap_mean_fitness,
                 "lineage_count_current": final_record.lineage_count_current,
@@ -405,6 +422,44 @@ def _render_model_audit(results) -> None:
                 ),
             }
         )
+
+
+def _final_lineage_rows(
+    results: LineageSimulationResult,
+) -> list[dict[str, float | int | str]]:
+    rows: list[dict[str, float | int | str]] = []
+    for lineage in results.final_lineages:
+        net_beneficial_mutations = (
+            lineage.beneficial_mutations - lineage.harmful_mutations
+        )
+        if lineage.lineage_id == 1:
+            lineage_label = "original seed lineage"
+        elif net_beneficial_mutations > 0:
+            lineage_label = "benefit-led lineage"
+        elif net_beneficial_mutations < 0:
+            lineage_label = "decay-led lineage"
+        else:
+            lineage_label = "neutral/balanced lineage"
+
+        rows.append(
+            {
+                "lineage_id": lineage.lineage_id,
+                "lineage_label": lineage_label,
+                "created_generation": lineage.generation_created,
+                "current_population": lineage.size,
+                "fitness_score": lineage.fitness_score,
+                "total_mutations": lineage.total_mutations,
+                "beneficial_mutations": lineage.beneficial_mutations,
+                "harmful_mutations": lineage.harmful_mutations,
+                "lethal_mutations": lineage.lethal_mutations,
+                "net_beneficial_mutations": net_beneficial_mutations,
+            }
+        )
+
+    return sorted(
+        rows,
+        key=lambda row: (-int(row["current_population"]), int(row["lineage_id"])),
+    )
 
 
 def _audit_rows(params: LineageParameters) -> list[dict[str, object]]:

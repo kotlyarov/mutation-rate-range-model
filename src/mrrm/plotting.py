@@ -185,19 +185,28 @@ def make_lineage_population_figure(results: LineageSimulationResult) -> go.Figur
         y=history["total_population"],
         mode="lines",
         name="Total population",
-        line={"width": 3},
+        line={"color": "#2563eb", "width": 3},
+    )
+    fig.add_scatter(
+        x=history["generation"],
+        y=history["original_lineage_population"],
+        mode="lines",
+        name="Original lineage population",
+        line={"color": "#6b7280", "width": 2},
     )
     fig.add_scatter(
         x=history["generation"],
         y=history["beneficial_lineage_population"],
         mode="lines",
         name="Benefit-led population",
+        line={"color": "#2e7d32", "width": 2},
     )
     fig.add_scatter(
         x=history["generation"],
         y=history["harmful_lineage_population"],
         mode="lines",
         name="Decay-led population",
+        line={"color": "#c62828", "width": 2},
     )
     fig.add_scatter(
         x=history["generation"],
@@ -205,6 +214,7 @@ def make_lineage_population_figure(results: LineageSimulationResult) -> go.Figur
         mode="lines",
         name="Mean fitness (pre-cap)",
         yaxis="y2",
+        line={"color": "#111827", "width": 2},
     )
     fig.update_layout(
         title="Population survival trajectory",
@@ -214,13 +224,22 @@ def make_lineage_population_figure(results: LineageSimulationResult) -> go.Figur
             "title": "Mean fitness (pre-cap)",
             "overlaying": "y",
             "side": "right",
-            "rangemode": "tozero",
+            "range": [0, 1],
             "showgrid": False,
         },
-        legend_title="Trajectory",
+        legend={
+            "title": {"text": "Trajectory"},
+            "x": 1.03,
+            "y": 1.0,
+            "xanchor": "left",
+            "yanchor": "top",
+            "bgcolor": "rgba(255, 255, 255, 0.88)",
+            "bordercolor": "rgba(0, 0, 0, 0.14)",
+            "borderwidth": 1,
+        },
         template="plotly_white",
         hovermode="x unified",
-        margin={"l": 48, "r": 24, "t": 56, "b": 48},
+        margin={"l": 56, "r": 220, "t": 56, "b": 48},
     )
     return fig
 

@@ -122,6 +122,13 @@ The first safety guard is a 60-second runtime limit and explicit
 discarding of temporary arrays and removed lineages. That reduces crash risk but
 does not guarantee memory safety on every machine.
 
+## Lineage Classes Are Not Full Family Trees
+
+The final lineage table reports current surviving lineage classes, not all
+descendants of a founding cell grouped as one family. Lineage id `1` is only
+the exact unmutated seed lineage; when one of its bacteria mutates, that
+descendant is assigned a new lineage id.
+
 ## Simplified Population Genetics
 
 The model is not a full Wright-Fisher, Moran, branching-process, or
