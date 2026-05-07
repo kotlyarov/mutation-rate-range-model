@@ -31,8 +31,8 @@ def main() -> None:
         "biological estimates."
     )
 
-    params = _sidebar_parameters()
-    if not st.sidebar.button("Run simulation", type="primary"):
+    params, run_requested = _sidebar_parameters()
+    if not run_requested:
         st.info(
             "Set model inputs in the sidebar, then run the simulation. The "
             "full default explicit-lineage run is intentionally heavy and may "
@@ -130,8 +130,17 @@ def main() -> None:
     _render_model_audit(results)
 
 
-def _sidebar_parameters(defaults: LineageParameters | None = None) -> LineageParameters:
+def _sidebar_parameters(
+    defaults: LineageParameters | None = None,
+) -> tuple[LineageParameters, bool]:
     defaults = defaults or LineageParameters()
+    _, button_column = st.sidebar.columns([0.05, 1.95])
+    with button_column:
+        run_requested = st.button(
+            "Run Simulation",
+            type="primary",
+            use_container_width=True,
+        )
     st.sidebar.header("Model inputs")
 
     with st.sidebar.expander("Experimental setup", expanded=True):
@@ -252,7 +261,7 @@ def _sidebar_parameters(defaults: LineageParameters | None = None) -> LineagePar
             step=10_000,
         )
 
-    return LineageParameters(
+    params = LineageParameters(
         seed_fitness=seed_fitness,
         seed_population=int(seed_population),
         population_cap=int(population_cap),
@@ -271,6 +280,7 @@ def _sidebar_parameters(defaults: LineageParameters | None = None) -> LineagePar
         max_runtime_seconds=max_runtime_seconds,
         max_lineage_classes=int(max_lineage_classes),
     )
+    return params, run_requested
 
 
 def _render_model_audit(results) -> None:

@@ -186,25 +186,37 @@ This is preferred over squaring fitness in the first rewrite because it is
 simpler and less aggressive. A stronger exponent should be added only as a
 named, reviewed parameter.
 
+If `randomness` is greater than zero, the implementation perturbs fitness before
+cap allocation:
+
+```text
+adjusted_fitness = max(0, fitness_score + Normal(0, randomness))
+selection_weight = size * adjusted_fitness
+```
+
+If all adjusted selection weights are zero or non-finite, the cap step falls
+back to size-proportional allocation.
+
 ### Randomness
 
 The requested `randomness` parameter is intended to make survival less
 deterministic.
 
-The exact rule is not defined yet. Any stochastic use of `randomness` should use
-the retained `random_seed` so runs can be reproduced.
+The current rule applies Normal noise to cap-selection fitness weights and uses
+the retained `random_seed` so runs can be reproduced. The rule is provisional
+and should still be reviewed scientifically.
 
 ## Modelling Assumptions
 
 ### Explicit Lineages
 
-The current lineage model tracks explicit lineages rather than aggregated lineage
-classes.
+The current lineage model tracks explicit current lineage classes rather than
+only aggregate population totals.
 
 This makes lineage accounting easier to understand but can cause explosive
-lineage growth. The implementation includes a 60-second runtime
-limit and should discard temporary arrays and removed lineages once their
-summary counts have been recorded.
+lineage growth. The implementation includes configurable runtime and
+lineage-count safety guards and discards temporary arrays and removed lineages
+once their summary counts have been recorded.
 
 ### Integer Population Counts
 

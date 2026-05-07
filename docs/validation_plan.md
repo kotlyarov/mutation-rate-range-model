@@ -31,12 +31,11 @@ Can the model reproduce empirical patterns within uncertainty?
 
 Before code changes, review and settle:
 
-- survival-noise rule for `randomness`
-- whether mean fitness is reported before cap selection, after cap selection,
-  or both
+- biological interpretation of the implemented Normal cap-selection noise
 - whether harmful mutation count is sufficient as a genome-integrity proxy
-- whether the 60-second runtime limit should be fixed or configurable
 - how to keep the current linear fitness formula inside intended boundaries
+- whether the soft cap-selection rule should remain or be replaced with a
+  strict shrinkage rule
 
 ## Mathematical Checks
 
@@ -96,6 +95,7 @@ Sensitivity analysis should test how outputs change when varying:
 - `randomness`
 - `random_seed`
 - `max_runtime_seconds`
+- `max_lineage_classes`
 - cap-selection rule
 - closest-integer rounding rule
 
@@ -113,6 +113,7 @@ Report which parameters most affect:
 - low-fitness lineage removals
 - collapse frequency across repeated seeds
 - runtime-limit failures
+- lineage-count-limit failures
 
 ## Empirical Validation Later
 
@@ -154,7 +155,7 @@ The validation process should detect:
 - high mutation rates are rewarded unrealistically
 - lethal mutations dominate all outputs immediately
 - lineages grow beyond practical memory limits
-- runs hit the 60-second runtime limit for ordinary parameter sets
+- runs hit runtime or lineage-count limits for ordinary parameter sets
 - cap selection produces unintuitive increases or losses
 - survival randomness overwhelms fitness
 - model is insensitive to major biological assumptions

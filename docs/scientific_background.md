@@ -80,7 +80,7 @@ It should answer:
 
 ```text
 Under these assumptions, what lineage trajectories occur for this mutation
-rate or mutation-rate sweep?
+rate?
 ```
 
 ## Why A Lineage Mutation-Selection Model?

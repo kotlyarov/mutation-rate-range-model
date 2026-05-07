@@ -48,9 +48,9 @@ The model does not include:
 
 ```text
 seed_fitness = 0.6
-seed_population = 100000
-population_cap = 1000000
-generations = 1000
+seed_population = 1000
+population_cap = 10000
+generations = 2500
 ```
 
 `seed_fitness` is the initial selected-environment fitness of the seed lineage.
@@ -70,10 +70,10 @@ must be a non-negative integer.
 ### Mutation Supply
 
 ```text
-mutation_rate = 0.002
-beneficial_mutation_rate = 0.001
-harmful_mutation_rate = 0.1
-lethal_mutation_rate = 0.01
+mutation_rate = 0.02
+beneficial_mutation_rate = 0.01
+harmful_mutation_rate = 0.5
+lethal_mutation_rate = 0.1
 compound_effect = 0.1
 ```
 
@@ -115,26 +115,31 @@ or harmful mutation count on the lineage fitness score.
 this value are removed during Selection.
 
 `randomness` is a provisional survival-noise standard deviation. It should be
-applied using `random_seed` so stochastic runs remain reproducible.
+applied using `random_seed` so stochastic runs remain reproducible. In the
+current implementation it perturbs cap-selection fitness weights:
+
+```text
+adjusted_fitness = max(0, fitness_score + Normal(0, randomness))
+```
 
 ### Simulation Controls
 
 ```text
-random_seed
-max_runtime_seconds = 60
-max_lineage_classes
+random_seed = 1
+max_runtime_seconds = 600
+max_lineage_classes = 100000
 ```
 
 `random_seed` is retained as a reproducibility control for Mutation and
 Selection sampling.
 
-`max_runtime_seconds` is a computational safety guard. The first implementation
-should stop and return a clear runtime-limit error if one run takes more than
-60 seconds.
+`max_runtime_seconds` is a configurable computational safety guard. The
+implementation stops with a clear runtime-limit error if one run takes longer
+than this value.
 
-`max_lineage_classes` remains available as a future computational safety
-control. If it is used as a safety guard, exceeding it should return a clear
-error rather than silently merging, truncating, or reweighting lineages.
+`max_lineage_classes` is an active computational safety guard. Exceeding it
+returns a clear error rather than silently merging, truncating, or reweighting
+lineages.
 
 ### Input Validation
 
@@ -445,8 +450,15 @@ target_size_i =
 ```
 
 `adjusted_fitness_i` should initially be `fitness_score_i`. If survival
-randomness is retained, it should perturb the selection weight in a documented,
-bounded way before `target_size_i` is calculated.
+randomness is greater than zero, the implementation uses:
+
+```text
+adjusted_fitness_i =
+  max(0, fitness_score_i + Normal(0, randomness))
+```
+
+If all selection weights are zero or non-finite after this perturbation, the
+implementation falls back to size-proportional allocation for that cap step.
 
 Linear weighting is preferred over squaring fitness for the first rewrite
 because it is the simpler soft-selection assumption. A squared or exponentiated
@@ -538,11 +550,13 @@ The explicit-lineage model can create many lineages. The implementation
 should protect local runs from crashing:
 
 ```text
-max_runtime_seconds = 60
+max_runtime_seconds = 600
+max_lineage_classes = 100000
 ```
 
-If one run exceeds this limit, return a clear error rather than continuing
-indefinitely.
+If one run exceeds `max_runtime_seconds` or `max_lineage_classes`, return a
+clear error rather than continuing indefinitely or silently changing scientific
+results.
 
 The implementation should also avoid retaining data that is not needed to
 proceed:
@@ -555,16 +569,15 @@ proceed:
   candidate state
 - avoid keeping duplicate copies of large lineage arrays during selection
 
-If future memory or lineage-count limits are needed, they should return clear
-errors rather than silently altering scientific results.
+The lineage-count limit is a practical safety guard, not a biological
+parameter.
 
 ## Implementation Readiness
 
 The following choices still deserve explicit review before later model changes:
 
-- the exact rule for applying `randomness` during survival or cap selection
 - how to keep the current linear fitness formula within intended boundaries
-- whether mean fitness is reported before or after cap selection, or both
+- whether the implemented Normal cap-selection noise is scientifically
+  appropriate
 - whether cap selection should use linear soft selection or a strict shrinkage
   rule that reduces every lineage
-- whether the 60-second runtime limit should be user configurable

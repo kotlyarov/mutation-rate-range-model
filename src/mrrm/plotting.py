@@ -192,7 +192,7 @@ def make_lineage_population_figure(results: LineageSimulationResult) -> go.Figur
         y=history["original_lineage_population"],
         mode="lines",
         name="Original lineage population",
-        line={"color": "#6b7280", "width": 2},
+        line={"color": "#515253", "width": 2},
     )
     fig.add_scatter(
         x=history["generation"],
@@ -214,7 +214,7 @@ def make_lineage_population_figure(results: LineageSimulationResult) -> go.Figur
         mode="lines",
         name="Mean fitness (pre-cap)",
         yaxis="y2",
-        line={"color": "#111827", "width": 2},
+        line={"color": "#9F27AF", "width": 2},
     )
     fig.update_layout(
         title="Population survival trajectory",
@@ -229,9 +229,10 @@ def make_lineage_population_figure(results: LineageSimulationResult) -> go.Figur
         },
         legend={
             "title": {"text": "Trajectory"},
-            "x": 1.03,
-            "y": 1.0,
-            "xanchor": "left",
+            "orientation": "h",
+            "x": 0.5,
+            "y": -0.26,
+            "xanchor": "center",
             "yanchor": "top",
             "bgcolor": "rgba(255, 255, 255, 0.88)",
             "bordercolor": "rgba(0, 0, 0, 0.14)",
@@ -239,7 +240,7 @@ def make_lineage_population_figure(results: LineageSimulationResult) -> go.Figur
         },
         template="plotly_white",
         hovermode="x unified",
-        margin={"l": 56, "r": 220, "t": 56, "b": 48},
+        margin={"l": 56, "r": 72, "t": 56, "b": 128},
     )
     return fig
 

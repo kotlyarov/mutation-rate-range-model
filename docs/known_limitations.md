@@ -17,16 +17,18 @@ produce plausible generational trajectories.
 
 It does not estimate a true biological optimum.
 
-## Not Implementation-Ready Yet
+## Remaining Scientific Review Points
 
-Several implementation choices still need review:
+Several implemented choices still need scientific review:
 
-- survival noise from `randomness`
-- whether mean fitness is reported before or after cap selection
-- whether the 60-second runtime limit should be user configurable
+- whether the Normal cap-selection noise controlled by `randomness` is an
+  appropriate survival proxy
 - how to keep the current linear fitness formula inside intended boundaries
+- whether harmful mutation count is sufficient as a genome-integrity proxy
+- whether the cap-selection rule should stay as soft selection or become a
+  strict shrinkage rule
 
-These should be settled before code is changed.
+These should be settled before later model-behavior changes.
 
 ## High-Level Mutation Categories
 
@@ -111,16 +113,18 @@ Overdispersed mutation processes would need a later model extension.
 ## Randomness And Reproducibility
 
 `random_seed` is retained so stochastic Mutation and Selection choices can be
-reproduced. The exact survival-noise rule for `randomness` still needs review.
+reproduced. The current survival-noise rule perturbs cap-selection fitness
+weights with Normal noise and clips negative adjusted fitness to zero. The rule
+is implemented, but its biological interpretation still needs review.
 
 ## Explicit Lineages Can Explode
 
 Every mutation-bearing bacterium creates a new lineage. With large populations,
 many generations, or high mutation rates, lineage counts can grow very quickly.
 
-The first safety guard is a 60-second runtime limit and explicit
-discarding of temporary arrays and removed lineages. That reduces crash risk but
-does not guarantee memory safety on every machine.
+The safety guards are `max_runtime_seconds` and `max_lineage_classes`, plus
+explicit discarding of temporary arrays and removed lineages. That reduces crash
+risk but does not guarantee memory safety on every machine.
 
 ## Lineage Classes Are Not Full Family Trees
 
@@ -176,6 +180,7 @@ The result may change with:
 - category normalization rule
 - cap-selection rule
 - runtime limit
+- lineage-count limit
 
 ## Risk Of False Precision
 

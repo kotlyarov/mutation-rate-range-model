@@ -19,8 +19,10 @@ The lineage rewrite is now specified and implemented:
 - `random_seed` is retained
 - fitness uses the current linear formula
 - population cap sizes are rounded to the closest integer
-- runtime and memory-safety requirements are documented
+- runtime and lineage-count safety guards are implemented and documented
 - harmful and lethal counts remain simplified proxies by design
+- `mean_fitness` is recorded before population-cap reallocation, with
+  `post_cap_mean_fitness` retained for audit
 
 The remaining concerns are mostly about interpretation and implementation
 details rather than missing math.
@@ -135,20 +137,20 @@ Independent closest-integer rounding may not sum exactly to `population_cap`.
 The first implementation allows the final total to go slightly above or below
 the cap.
 
-### 7. Runtime And Memory Protection Is Required
+### 7. Runtime And Lineage-Count Protection Is Required
 
 Decision:
 
-The implementation stops a run with a clear error if it takes
-more than 60 seconds. It should also discard temporary mutation arrays, removed
-lineages, and intermediate candidate states that are not needed for future
-calculations or display.
+The implementation stops a run with a clear error if it exceeds
+`max_runtime_seconds` or `max_lineage_classes`. It also discards temporary
+mutation arrays, removed lineages, and intermediate candidate states that are
+not needed for future calculations or display.
 
 Concern:
 
-A time limit is hardware-dependent and does not fully protect against sudden
-memory exhaustion. A later implementation may also need a lineage-count or
-memory-budget error threshold.
+A time limit is hardware-dependent and the lineage-count guard does not fully
+protect against sudden memory exhaustion. A later implementation may still need
+a memory-budget error threshold.
 
 ### 8. Harmful And Lethal Counts Stay Simplified
 
@@ -176,8 +178,10 @@ should not be reported from one run.
 
 ## Recommended Review Order
 
-1. Decide the exact survival-noise rule for `randomness`.
-2. Decide whether mean fitness is reported before cap selection, after cap
-   selection, or both.
-3. Decide whether the 60-second runtime limit should be fixed or configurable.
-4. Decide how to keep linear fitness inside intended boundaries later.
+1. Review whether the implemented Normal cap-selection noise is biologically
+   appropriate.
+2. Decide how to keep linear fitness inside intended boundaries later.
+3. Decide whether the cap rule should remain soft selection or become a strict
+   shrinkage rule.
+4. Decide how future mutation-rate sweeps should aggregate stochastic
+   replicates.

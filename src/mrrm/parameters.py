@@ -64,14 +64,14 @@ class LineageParameters:
     """
 
     seed_fitness: float = 0.6
-    seed_population: int = 100_000
-    population_cap: int = 1_000_000
-    generations: int = 1_000
+    seed_population: int = 1_000
+    population_cap: int = 10_000
+    generations: int = 2_500
 
-    mutation_rate: float = 0.002
-    beneficial_mutation_rate: float = 0.001
-    harmful_mutation_rate: float = 0.1
-    lethal_mutation_rate: float = 0.01
+    mutation_rate: float = 0.02
+    beneficial_mutation_rate: float = 0.01
+    harmful_mutation_rate: float = 0.5
+    lethal_mutation_rate: float = 0.1
     compound_effect: float = 0.1
 
     mutation_effect: float = 0.01
@@ -82,7 +82,7 @@ class LineageParameters:
     collapse_fitness_threshold: float = 0.50
 
     random_seed: int | None = 1
-    max_runtime_seconds: float = 60.0
+    max_runtime_seconds: float = 600.0
     max_lineage_classes: int = 100_000
 
     def __post_init__(self) -> None:

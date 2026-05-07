@@ -63,10 +63,9 @@ DOI:
 
 Project relevance:
 
-- provides the closest experimental proxy found for the first
-  `survival_stochasticity` default
-- estimates LTEE descendant-number variance and reports the ancestor near 1.3,
-  with bottleneck-only stochasticity near 1
+- provides background for future review of drift and stochastic survival
+  assumptions
+- is not currently used to fit the lineage app's `randomness` input
 
 ### Human Population Genetics and Genomics selection chapter
 

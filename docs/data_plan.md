@@ -11,6 +11,11 @@ inputs, not validated fitted model parameters.
 The current lineage model should not pretend that parameters are fitted to data
 until source validation, fitting, and uncertainty treatment are complete.
 
+Current scaffolded files include `data/source_registry.json`, raw Sprouffske
+2018 files under `data/raw/sprouffske_2018/`, and early processed CSV files
+under `data/processed/`. The Streamlit app does not currently consume these
+files during a lineage run.
+
 ## Data goals
 
 The eventual goal is to compare model behaviour against empirical patterns such as:

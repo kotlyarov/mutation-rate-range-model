@@ -251,8 +251,9 @@ def test_population_trajectory_figure_uses_population_counts_and_solid_lines():
     assert figure.layout.yaxis.title.text == "Population size"
     assert figure.layout.yaxis2.title.text == "Mean fitness (pre-cap)"
     assert tuple(figure.layout.yaxis2.range) == (0, 1)
-    assert figure.layout.legend.x > 1.0
-    assert figure.layout.margin.r >= 200
+    assert figure.layout.legend.orientation == "h"
+    assert figure.layout.legend.y < 0
+    assert figure.layout.margin.b >= 120
 
 
 def test_lineage_limit_returns_clear_error():
